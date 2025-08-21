@@ -1,0 +1,2802 @@
+
+<!-- Local rules -->
+<!-- Optimized for Wazuh 4.12.0 with MITRE ATT&CK Framework -->
+<!-- Copyright (C) 2015, Wazuh Inc. -->
+
+<!-- ======================================== -->
+<!--     MITRE ATT&CK OPTIMIZED RULES         -->
+<!-- ======================================== -->
+
+<!-- ============================================= -->
+<!--   100200-100250: Initial Access & Execution   -->
+<!-- ============================================= -->
+<group name="local,">
+  
+  <!-- SYSCHECK/FIM - Ignora file di log e temporanei -->
+  <rule id="100200" level="0">
+    <if_sid>550</if_sid>
+    <match>/var/log/|/tmp/|/var/tmp/|.log|.tmp|/var/cache/</match>
+    <description>Ignore changes to log and temp files</description>
+  </rule>
+  
+  <rule id="100201" level="0">
+    <if_sid>594</if_sid>
+    <match>/var/log/|/tmp/|.cache|.log</match>
+    <description>Ignore syscheck on logs</description>
+  </rule>
+  
+  <!-- LINUX AUDIT - Ignora eventi comuni -->
+  <rule id="100202" level="0">
+    <if_sid>750</if_sid>
+    <match>cron|systemd|NetworkManager|snapd</match>
+    <description>Ignore common audit events</description>
+  </rule>
+  
+  <!-- SYSMON Process Creation - Ignora processi Windows comuni -->
+  <rule id="100203" level="0">
+    <if_sid>61602</if_sid>
+    <field name="win.eventdata.image">\\Windows\\System32\\svchost.exe$|\\Windows\\System32\\conhost.exe$|\\Windows\\System32\\SearchProtocolHost.exe$</field>
+    <description>Ignore common Windows system processes</description>
+  </rule>
+  
+  <rule id="100204" level="0">
+    <if_sid>61602</if_sid>
+    <field name="win.eventdata.parentimage">\\Windows\\System32\\services.exe$|\\Windows\\System32\\svchost.exe$</field>
+    <field name="win.eventdata.image">\\Windows\\System32\\|\\Windows\\SysWOW64\\</field>
+    <description>Ignore Windows services spawning system processes</description>
+  </rule>
+
+  <rule id="100205" level="0">
+    <if_sid>92650</if_sid>
+    <field name="win.eventdata.serviceName">^PsShutdown$</field>
+    <field name="win.eventdata.imagePath">(?i)%SystemRoot%.*\\PSSDNSVC\.EXE$</field>
+    <description>Whitelist: PsShutdown (GPO) - service created from SystemRoot</description>
+  </rule>
+  
+  <rule id="100206" level="0">
+    <if_sid>91504</if_sid>
+    <match>Built inbound|Built outbound</match>
+    <match>:80|:443|:53</match>
+    <description>Ignore common connections on Cisco FTD</description>
+  </rule>
+  
+  <!-- Sysmon Event 61644 -->
+  <rule id="100207" level="0">
+    <if_sid>61644</if_sid>
+    <field name="win.eventdata.queryname">microsoft.com$|windows.com$|windowsupdate.com$|office.com$</field>
+    <description>Ignore DNS queries to Microsoft domains</description>
+  </rule>
+
+  <rule id="100208" level="10">
+    <if_sid>61603</if_sid>
+    <field name="win.eventdata.image">TiWorker\.exe|TrustedInstaller\.exe</field>
+    <field name="win.eventdata.targetFilename" negate="yes">\\Windows\\WinSxS\\|\\Windows\\servicing\\</field>
+    <description>Suspicious: Windows Update process writing outside expected directories</description>
+  </rule>
+
+</group>
+
+<group name="web,">
+  
+  <!-- Esclusione per CSF che controlla Apache status -->  
+  <rule id="100300" level="0">
+    <if_sid>31516</if_sid>
+    <srcip>127.0.0.1</srcip>
+    <url>server-status</url>
+    <description>Ignore CSF checking Apache server-status - False positive</description>
+  </rule>
+  
+</group>
+
+<!-- ============================================= -->
+<!--   110000-119999: Initial Access & Execution   -->
+<!-- ============================================= -->
+<group name="mitre_initial_access,mitre_execution,">
+
+  <!-- T1059.001 - PowerShell Execution -->
+  <rule id="110001" level="7">
+    <if_group>sysmon_event1</if_group>
+    <field name="win.eventdata.image" type="pcre2">(?i)powershell\.exe$</field>
+    <field name="win.eventdata.parentImage" type="pcre2">^(?!.*\\(explorer|services|svchost|mmc)\.exe)</field>
+    <description>PowerShell execution from suspicious parent - $(win.eventdata.parentImage)</description>
+    <mitre>
+      <id>T1059.001</id>
+    </mitre>
+  </rule>
+
+  <!-- T1059.001 - PowerShell with Suspicious Parameters -->
+  <rule id="110002" level="12">
+    <if_sid>110001</if_sid>
+    <field name="win.eventdata.commandLine" type="pcre2">(?i)(-enc|-e\s|-bypass|-nop|-w\s+hidden|-windowstyle\s+hidden|downloadstring|invoke-expression|iex\s)</field>
+    <description>PowerShell with obfuscation/download parameters - CRITICAL</description>
+    <mitre>
+      <id>T1059.001</id>
+      <id>T1027</id>
+    </mitre>
+  </rule>
+
+  <!-- T1059.003 - Windows Command Shell -->
+  <rule id="110010" level="5">
+    <if_group>sysmon_event1</if_group>
+    <field name="win.eventdata.image" type="pcre2">(?i)cmd\.exe$</field>
+    <field name="win.eventdata.parentImage" type="pcre2">^(?!.*\\(explorer|services|svchost)\.exe)</field>
+    <description>CMD execution from non-standard parent</description>
+    <mitre>
+      <id>T1059.003</id>
+    </mitre>
+  </rule>
+
+  <!-- T1059.005 - Visual Basic Script Execution -->
+  <rule id="110020" level="9">
+    <if_group>sysmon_event1</if_group>
+    <field name="win.eventdata.image" type="pcre2">(?i)(cscript|wscript|mshta)\.exe$</field>
+    <description>Script engine execution detected - $(win.eventdata.image)</description>
+    <mitre>
+      <id>T1059.005</id>
+    </mitre>
+  </rule>
+
+  <!-- T1047 - Windows Management Instrumentation -->
+  <rule id="110030" level="8">
+    <if_group>sysmon_event1</if_group>
+    <field name="win.eventdata.image" type="pcre2">(?i)(wmic|wmiprvse)\.exe$</field>
+    <field name="win.eventdata.commandLine" type="pcre2">(?i)(process\s+call|create|shadowcopy|delete)</field>
+    <description>WMI suspicious activity - $(win.eventdata.commandLine)</description>
+    <mitre>
+      <id>T1047</id>
+    </mitre>
+  </rule>
+
+  <!-- T1218.010 - Regsvr32 -->
+  <rule id="110040" level="9">
+    <if_group>sysmon_event1</if_group>
+    <field name="win.eventdata.image" type="pcre2">(?i)regsvr32\.exe$</field>
+    <field name="win.eventdata.commandLine" type="pcre2">(?i)(\/s|\/i:|scrobj\.dll|javascript:|vbscript:)</field>
+    <description>Regsvr32 proxy execution detected</description>
+    <mitre>
+      <id>T1218.010</id>
+    </mitre>
+  </rule>
+
+  <!-- T1566 - Phishing Attachment Execution -->
+  <rule id="110050" level="10">
+    <if_group>sysmon_event1</if_group>
+    <field name="win.eventdata.parentImage" type="pcre2">(?i)(winword|excel|powerpnt|outlook)\.exe$</field>
+    <field name="win.eventdata.image" type="pcre2">(?i)(cmd|powershell|wscript|cscript|mshta)\.exe$</field>
+    <description>Office spawning suspicious process - possible phishing</description>
+    <mitre>
+      <id>T1566.001</id>
+      <id>T1204.002</id>
+    </mitre>
+  </rule>
+
+  <!-- T1053 - Scheduled Task Creation -->
+  <rule id="110060" level="9">
+    <if_group>sysmon_event1</if_group>
+    <field name="win.eventdata.image" type="pcre2">(?i)schtasks\.exe$</field>
+    <field name="win.eventdata.commandLine" type="pcre2">(?i)\/create</field>
+    <description>Scheduled task created via command line</description>
+    <mitre>
+      <id>T1053.005</id>
+    </mitre>
+  </rule>
+
+</group>
+
+<!-- ============================================= -->
+<!--      110199-110299: Suricata Custom Rules     -->
+<!--      Versione: 2.0 - Ristrutturato           -->
+<!--      Data: 2025-08-14                        -->
+<!-- ============================================= -->
+
+<group name="local_suricata,">
+
+  <!-- ========================================== -->
+  <!-- SEZIONE 1: REGOLE BASE E FONDAMENTALI     -->
+  <!-- ========================================== -->
+  
+  <!-- Suricata Alert Extension - extends the default Suricata alert rule -->
+  <rule id="110198" level="3">
+    <if_sid>86601</if_sid>
+    <description>Suricata: Alert detected - $(alert.signature)</description>
+    <group>suricata,ids,</group>
+  </rule>
+
+  <!-- ========================================== -->
+  <!-- SEZIONE 2: CLASSIFICAZIONE PER SEVERIT�   -->
+  <!-- ========================================== -->
+
+  <!-- Suricata: Alert - Critical Priority (severity 1) -->
+  <rule id="110200" level="12">
+    <if_sid>110198</if_sid>
+    <match>"severity":1</match>
+    <description>Suricata: CRITICAL priority alert</description>
+    <group>suricata,ids,attack,critical,</group>
+  </rule>
+
+  <!-- Suricata: Alert - High Priority (severity 2) -->
+  <rule id="110201" level="10">
+    <if_sid>110198</if_sid>
+    <match>"severity":2</match>
+    <description>Suricata: HIGH priority alert</description>
+    <group>suricata,ids,attack,</group>
+  </rule>
+
+  <!-- Suricata: Alert - Medium Priority (severity 3) -->
+  <rule id="110202" level="7">
+    <if_sid>110198</if_sid>
+    <match>"severity":3</match>
+    <description>Suricata: MEDIUM priority alert</description>
+    <group>suricata,ids,</group>
+  </rule>
+
+  <!-- Suricata: Alert - Low Priority (severity 4) -->
+  <rule id="110203" level="5">
+    <if_sid>110198</if_sid>
+    <match>"severity":4</match>
+    <description>Suricata: LOW priority alert</description>
+    <group>suricata,ids,</group>
+  </rule>
+
+  <!-- ========================================== -->
+  <!-- SEZIONE 3: CATEGORIE DI ATTACCO          -->
+  <!-- ========================================== -->
+
+  <!-- Malware Detection - CRITICAL -->
+  <rule id="110204" level="14">
+    <if_sid>110198</if_sid>
+    <match>A Network Trojan was detected|Malware|Virus|Backdoor|Ransomware</match>
+    <description>Suricata: MALWARE detected</description>
+    <group>suricata,ids,malware,attack,</group>
+  </rule>
+
+  <!-- Nielsen/IMRWorldwide Analytics - Whitelist -->
+  <rule id="110269" level="0">
+    <if_sid>110204</if_sid>
+    <match>imrworldwide.com</match>
+    <description>Nielsen analytics traffic (legitimate telemetry - whitelisted)</description>
+    <options>no_log</options>
+    <group>suricata,whitelist,analytics,</group>
+  </rule>
+
+  <!-- Web Attack - HIGH -->
+  <rule id="110205" level="10">
+    <if_sid>110198</if_sid>
+    <match>Web Application Attack|SQL Injection|XSS|Cross Site|SQLI|RCE|LFI|RFI</match>
+    <description>Suricata: Web application attack</description>
+    <group>suricata,ids,web_attack,attack,</group>
+  </rule>
+
+  <!-- Brute Force Attack - HIGH -->
+  <rule id="110206" level="10">
+    <if_sid>110198</if_sid>
+    <match>brute|bruteforce|credential|password|authentication</match>
+    <description>Suricata: Brute force attempt</description>
+    <group>suricata,ids,brute_force,authentication_failures,attack,</group>
+  </rule>
+
+  <!-- Port Scan Detection - MEDIUM -->
+  <rule id="110207" level="8">
+    <if_sid>110198</if_sid>
+    <match>Attempted Information Leak|Network Scan|SCAN|Port Scan|Nmap</match>
+    <description>Suricata: Port scan/Reconnaissance detected</description>
+    <group>suricata,ids,recon,</group>
+  </rule>
+
+  <!-- DoS/DDoS Attack - HIGH -->
+  <rule id="110214" level="12">
+    <if_sid>110198</if_sid>
+    <match type="pcre2">(?i)(dos|denial|ddos|flood|amplification|STREAM 3way handshake wrong|syn flood|rst flood|udp flood|icmp flood)</match>
+    <description>Suricata: DoS/DDoS attack detected - $(alert.signature)</description>
+    <group>suricata,ids,dos,attack,mitre_t1499,</group>
+    <mitre>
+      <id>T1499</id>
+    </mitre>
+  </rule>
+
+  <!-- ========================================== -->
+  <!-- SEZIONE 4: TIPI DI EVENTO                -->
+  <!-- ========================================== -->
+
+  <!-- DNS Events -->
+  <rule id="110208" level="2">
+    <if_sid>86600</if_sid>
+    <match>"event_type":"dns"</match>
+    <description>Suricata: DNS Query</description>
+    <group>suricata,dns,</group>
+  </rule>
+
+  <!-- Suspicious DNS -->
+  <rule id="110209" level="9">
+    <if_sid>110208</if_sid>
+    <match>suspicious|malware|phishing|c2|command|malicious|dga|exfiltration</match>
+    <description>Suricata: Suspicious DNS query detected</description>
+    <group>suricata,dns,suspicious,</group>
+  </rule>
+
+  <!-- HTTP Events -->
+  <rule id="110210" level="2">
+    <if_sid>86600</if_sid>
+    <match>"event_type":"http"</match>
+    <description>Suricata: HTTP Request</description>
+    <group>suricata,http,</group>
+  </rule>
+
+  <!-- TLS/SSL Events -->
+  <rule id="110211" level="2">
+    <if_sid>86600</if_sid>
+    <match>"event_type":"tls"</match>
+    <description>Suricata: TLS Connection</description>
+    <group>suricata,tls,</group>
+  </rule>
+
+  <!-- SSH Events -->
+  <rule id="110212" level="3">
+    <if_sid>86600</if_sid>
+    <match>"event_type":"ssh"</match>
+    <description>Suricata: SSH Connection</description>
+    <group>suricata,ssh,</group>
+  </rule>
+
+  <!-- File Events -->
+  <rule id="110213" level="5">
+    <if_sid>86600</if_sid>
+    <match>"event_type":"fileinfo"</match>
+    <description>Suricata: File transfer detected</description>
+    <group>suricata,file,</group>
+  </rule>
+
+  <!-- Stats/Flow Events (informational) -->
+  <rule id="110219" level="0">
+    <if_sid>86600</if_sid>
+    <match>"event_type":"stats"</match>
+    <description>Suricata: Statistics</description>
+    <group>suricata,stats,</group>
+  </rule>
+
+  <!-- Flow Events -->
+  <rule id="110221" level="0">
+    <if_sid>86600</if_sid>
+    <match>"event_type":"flow"</match>
+    <description>Suricata: Flow event</description>
+    <group>suricata,flow,</group>
+  </rule>
+
+  <!-- SNMP Events -->
+  <rule id="110222" level="2">
+    <if_sid>86600</if_sid>
+    <match>"event_type":"snmp"</match>
+    <description>Suricata: SNMP traffic</description>
+    <group>suricata,snmp,</group>
+  </rule>
+
+  <!-- ========================================== -->
+  <!-- SEZIONE 5: RILEVAMENTO ANOMALIE          -->
+  <!-- ========================================== -->
+
+  <!-- Protocol Anomaly -->
+  <rule id="110215" level="8">
+    <if_sid>110198</if_sid>
+    <match>Protocol Command Decode|Generic Protocol Command Decode|Protocol Anomaly</match>
+    <description>Suricata: Protocol anomaly detected</description>
+    <group>suricata,ids,anomaly,</group>
+  </rule>
+
+  <!-- Potentially Bad Traffic -->
+  <rule id="110216" level="6">
+    <if_sid>110198</if_sid>
+    <match>Potentially Bad Traffic|Suspicious Traffic</match>
+    <description>Suricata: Potentially bad traffic</description>
+    <group>suricata,ids,</group>
+  </rule>
+
+  <!-- Policy Violation -->
+  <rule id="110217" level="7">
+    <if_sid>110198</if_sid>
+    <match>Potential Corporate Privacy Violation|Policy Violation|Inappropriate Content</match>
+    <description>Suricata: Policy violation</description>
+    <group>suricata,ids,policy_violation,</group>
+  </rule>
+
+  <!-- ========================================== -->
+  <!-- SEZIONE 6: MINACCE SPECIFICHE            -->
+  <!-- ========================================== -->
+
+  <!-- Known Bad Host/C2 -->
+  <rule id="110218" level="13">
+    <if_sid>110198</if_sid>
+    <match>known bad|blacklist|blocklist|malicious|c&amp;c|command and control|botnet|C2 server</match>
+    <description>Suricata: Connection to known malicious host/C2</description>
+    <group>suricata,ids,malicious_host,c2,attack,</group>
+  </rule>
+
+  <!-- Exploit Kits -->
+  <rule id="110253" level="13">
+    <if_sid>110198</if_sid>
+    <match type="pcre2">(?i)(Exploit\s+Kit|Angler\s+EK|Neutrino\s+EK|RIG\s+Exploit|Sundown\s+EK|Nuclear\s+EK)</match>
+    <description>Suricata: Exploit Kit activity detected</description>
+    <group>suricata,ids,exploit_kit,attack,</group>
+  </rule>
+  
+  <!-- SMTP with STARTTLS on port 25 - Whitelist legitimate email encryption -->
+  <rule id="110270" level="0">
+    <if_sid>110200</if_sid>
+    <regex>"signature_id":[[:space:]]*3300298.*"dest_port":[[:space:]]*25</regex>
+    <description>Legitimate SMTP with STARTTLS on port 25 (whitelisted)</description>
+    <options>no_log</options>
+    <group>suricata,smtp,tls,whitelist,normal_traffic,</group>
+  </rule>
+  
+  <!-- SMTP with STARTTLS on port 25 - whitelist -->
+  <rule id="110257" level="0">
+    <if_sid>110198</if_sid>
+    <match>SSL/TLS trafic on unusual SSL/TLS port</match>
+    <field name="dest_port">25</field>
+    <field name="app_proto">tls</field>
+    <field name="app_proto_orig">smtp</field>
+    <description>Suricata: SMTP with STARTTLS on port 25 (normal email encryption - whitelisted)</description>
+    <options>no_log</options>
+  </rule>
+  
+  <!-- Generic TLS on unusual ports - reduce severity -->
+  <rule id="110258" level="6">
+    <if_sid>110198</if_sid>
+    <match>SSL/TLS trafic on unusual SSL/TLS port</match>
+    <description>Suricata: TLS on non-standard port (reduced severity)</description>
+    <group>suricata,tls,protocol_anomaly,</group>
+  </rule>
+  
+  <!-- Ookla Speedtest Server on port 8080 - whitelist all Suricata alerts (IPv4) -->
+  <rule id="110255" level="0">
+    <if_sid>110198</if_sid>
+    <field name="src_ip">185.54.81.15</field>
+    <field name="dest_port">8080</field>
+    <description>Ookla Speedtest Server traffic on port 8080 (whitelisted)</description>
+    <options>no_log</options>
+    <group>suricata,speedtest,whitelist,</group>
+  </rule>
+  
+  <!-- Ookla Speedtest Server on port 8080 - whitelist IPv6 subnet 2a02:4460:1:1::/64 -->
+  <rule id="110259" level="0">
+    <if_sid>110198</if_sid>
+    <field name="src_ip" type="pcre2">^2a02:4460:0001:0001:</field>
+    <field name="dest_port">8080</field>
+    <description>Ookla Speedtest Server IPv6 subnet 2a02:4460:1:1::/64 on port 8080 (whitelisted)</description>
+    <options>no_log</options>
+    <group>suricata,speedtest,whitelist,</group>
+  </rule>
+  
+  <!-- Ookla Speedtest Server on port 8080 - whitelist IPv6 subnet 2a02:4460:1:2::/64 -->
+  <rule id="110265" level="0">
+    <if_sid>110198</if_sid>
+    <field name="src_ip" type="pcre2">^2a02:4460:0001:0002:</field>
+    <field name="dest_port">8080</field>
+    <description>Ookla Speedtest Server IPv6 subnet 2a02:4460:1:2::/64 on port 8080 (whitelisted)</description>
+    <options>no_log</options>
+    <group>suricata,speedtest,whitelist,</group>
+  </rule>
+  
+  <!-- All Speedtest Server port 8080 traffic - complete whitelist -->
+  <rule id="110256" level="0">
+    <if_sid>110198</if_sid>
+    <field name="dest_port">8080</field>
+    <description>Speedtest server port 8080 - all alerts whitelisted</description>
+    <options>no_log</options>
+    <group>suricata,speedtest,whitelist,</group>
+  </rule>
+
+  <!-- Cryptocurrency Mining -->
+  <rule id="110254" level="10">
+    <if_sid>110198</if_sid>
+    <match>Crypto|Mining|Miner|CoinMiner|Monero|Stratum</match>
+    <description>Suricata: Cryptocurrency mining activity</description>
+    <group>suricata,ids,cryptomining,</group>
+  </rule>
+
+  <!-- ========================================== -->
+  <!-- SEZIONE 7: EMERGING THREATS (ET)         -->
+  <!-- ========================================== -->
+
+  <!-- ET TROJAN -->
+  <rule id="110240" level="14">
+    <if_sid>110198</if_sid>
+    <match>ET TROJAN</match>
+    <description>Suricata: TROJAN detected (Emerging Threats)</description>
+    <group>suricata,ids,trojan,malware,et,attack,</group>
+  </rule>
+
+  <!-- ET MALWARE -->
+  <rule id="110241" level="14">
+    <if_sid>110198</if_sid>
+    <match>ET MALWARE</match>
+    <description>Suricata: MALWARE detected (Emerging Threats)</description>
+    <group>suricata,ids,malware,et,attack,</group>
+  </rule>
+
+  <!-- ET EXPLOIT -->
+  <rule id="110242" level="12">
+    <if_sid>110198</if_sid>
+    <match>ET EXPLOIT</match>
+    <description>Suricata: EXPLOIT attempt (Emerging Threats)</description>
+    <group>suricata,ids,exploit,et,attack,</group>
+  </rule>
+
+  <!-- ET CNC (Command & Control) -->
+  <rule id="110243" level="14">
+    <if_sid>110198</if_sid>
+    <match>ET CNC|ET C&amp;C</match>
+    <description>Suricata: Command & Control communication (Emerging Threats)</description>
+    <group>suricata,ids,c2,et,attack,</group>
+  </rule>
+
+  <!-- ET SCAN -->
+  <rule id="110244" level="9">
+    <if_sid>110198</if_sid>
+    <match>ET SCAN</match>
+    <description>Suricata: Network scan (Emerging Threats)</description>
+    <group>suricata,ids,recon,scan,et,</group>
+  </rule>
+
+  <!-- ET POLICY -->
+  <rule id="110245" level="7">
+    <if_sid>110198</if_sid>
+    <match>ET POLICY</match>
+    <description>Suricata: Policy violation (Emerging Threats)</description>
+    <group>suricata,ids,policy,et,</group>
+  </rule>
+
+  <!-- ET INFO -->
+  <rule id="110246" level="6">
+    <if_sid>110198</if_sid>
+    <match>ET INFO</match>
+    <description>Suricata: Information leak (Emerging Threats)</description>
+    <group>suricata,ids,info_leak,et,</group>
+  </rule>
+
+  <!-- GPL Rules -->
+  <rule id="110247" level="11">
+    <if_sid>110198</if_sid>
+    <match>GPL ATTACK_RESPONSE</match>
+    <description>Suricata: Attack response detected (GPL)</description>
+    <group>suricata,ids,attack_response,gpl,</group>
+  </rule>
+
+  <!-- ========================================== -->
+  <!-- SEZIONE 8: PROTOCOLLI/SERVIZI SPECIFICI  -->
+  <!-- ========================================== -->
+
+  <!-- Whitelist: TCP stream issues on non-SMB ports -->
+  <rule id="110249" level="0">
+    <if_sid>110198</if_sid>
+    <match>"signature_id":2210020</match>
+    <field name="dest_port" negate="yes">445|139|135</field>
+    <description>Suricata: TCP stream issue on non-SMB port (whitelisted)</description>
+    <options>no_log</options>
+  </rule>
+
+  <!-- SMB/NetBIOS attacks -->
+  <rule id="110250" level="13">
+    <if_sid>110198</if_sid>
+    <match>SMB|NETBIOS|MS17-010|EternalBlue|WannaCry|DoublePulsar</match>
+    <description>Suricata: SMB/NetBIOS attack detected</description>
+    <group>suricata,ids,smb,attack,</group>
+  </rule>
+  
+  <!-- NTLM Responder attack detection - CRITICAL -->
+  <rule id="110266" level="15">
+    <if_sid>110198</if_sid>
+    <match>NTLM Secure Service Provider|NTLMSSP Challenge|Responder|credentials capturing</match>
+    <description>CRITICAL: Possible NTLM credential theft attack (Responder) from $(src_ip) to $(dest_ip)</description>
+    <group>suricata,ids,credential_theft,ntlm,responder,critical,attack,</group>
+  </rule>
+  
+  <!-- Legitimate NTLM authentication on internal LAN 192.168.220.0/22 - reduce severity -->
+  <rule id="110267" level="3">
+    <if_sid>110198</if_sid>
+    <match>NTLM Secure Service Provider|NTLMSSP Challenge</match>
+    <field name="src_ip" type="pcre2">^192\.168\.(220|221|222|223)\.</field>
+    <field name="dest_ip" type="pcre2">^192\.168\.(220|221|222|223|152)\.</field>
+    <description>Internal NTLM authentication on LAN (normal SMB activity)</description>
+    <group>suricata,smb,ntlm,internal_traffic,</group>
+  </rule>
+  
+  <!-- Legitimate SMB traffic on internal networks -->
+  <rule id="110268" level="2">
+    <if_sid>110198</if_sid>
+    <match>SMB|NETBIOS</match>
+    <field name="src_ip" type="pcre2">^192\.168\.(220|221|222|223|152)\.</field>
+    <field name="dest_ip" type="pcre2">^192\.168\.(220|221|222|223|152)\.</field>
+    <match negate="yes">EternalBlue|WannaCry|DoublePulsar|MS17-010</match>
+    <description>Normal SMB traffic on internal LAN</description>
+    <group>suricata,smb,internal_traffic,</group>
+  </rule>
+
+  <!-- RDP attacks -->
+  <rule id="110251" level="12">
+    <if_sid>110198</if_sid>
+    <match>RDP|BlueKeep|CVE-2019-0708|Terminal Server</match>
+    <field name="dest_port" negate="yes">21</field>
+    <field name="dest_port" negate="yes">20</field>
+    <description>Suricata: RDP attack attempt</description>
+    <group>suricata,ids,rdp,attack,</group>
+  </rule>
+
+  <!-- SSH attacks -->
+  <rule id="110252" level="9">
+    <if_sid>110198</if_sid>
+    <match>SSH|libssh|CVE-2018-10933</match>
+    <description>Suricata: SSH attack attempt</description>
+    <group>suricata,ids,ssh,attack,</group>
+  </rule>
+
+  <!-- ========================================== -->
+  <!-- SEZIONE 9: IPS - AZIONI BASATE SU ACTION -->
+  <!-- ========================================== -->
+
+  <!-- Alert was BLOCKED (IPS mode) -->
+  <rule id="110260" level="8">
+    <if_sid>110198</if_sid>
+    <match>"action":"blocked"</match>
+    <description>Suricata: Attack BLOCKED by IPS</description>
+    <group>suricata,ips,blocked,</group>
+  </rule>
+
+  <!-- ********************************************************* -->
+  <!-- REGOLA MODIFICATA: Critical alert NOT blocked            -->
+  <!-- LEVEL RIDOTTO DA 14 A 10 PER NON INVIARE EMAIL          -->
+  <!-- ********************************************************* -->
+  <rule id="110261" level="10">
+    <if_sid>110200</if_sid>
+    <match>"action":"allowed"</match>
+    <description>Suricata: CRITICAL attack NOT blocked (email disabled)</description>
+    <options>no_full_log</options>
+    <group>suricata,ids,critical,not_blocked,</group>
+  </rule>
+
+  <!-- Drop Event (IPS mode) -->
+  <rule id="110220" level="10">
+    <if_sid>86600</if_sid>
+    <match>"event_type":"drop"</match>
+    <description>Suricata: Packet DROPPED by IPS</description>
+    <group>suricata,ips,drop,</group>
+  </rule>
+
+  <!-- ========================================== -->
+  <!-- SEZIONE 10: TUNING E DECLASSAMENTI       -->
+  <!-- ========================================== -->
+
+  <!-- SMTP TLS on port 25 (sig 3300298) - whitelist -->
+  <rule id="110272" level="0">
+    <if_sid>110261</if_sid>
+    <match>3300298</match>
+    <description>Suricata: TLS on unusual port (signature 3300298) - whitelisted for known services</description>
+    <options>no_log</options>
+    <group>suricata,tls,whitelist,normal_traffic,</group>
+  </rule>
+
+  <!-- UniFi guest: HTTP su 8880 (sig 3300303) -> declassa -->
+  <rule id="110263" level="4">
+    <if_sid>110261</if_sid>
+    <regex>"signature_id":[[:space:]]*3300303.*"dest_port":[[:space:]]*8880</regex>
+    <description>Suricata: HTTP su 8880 (UniFi) � declassato</description>
+    <options>no_full_log</options>
+    <group>suricata,ids,policy_violation,</group>
+  </rule>
+
+  <!-- UniFi Controller Guest Page JavaScript files - whitelist -->
+  <rule id="110271" level="0">
+    <if_sid>110198</if_sid>
+    <regex>"signature_id":1000008.*"dest_port":8880</regex>
+    <description>UniFi Controller Guest Page - Dangerous File Download (whitelisted)</description>
+    <options>no_log</options>
+  </rule>
+
+  <!-- Curl User Agent (come nel tuo esempio) -> declassa -->
+  <rule id="110264" level="6">
+    <if_sid>110261</if_sid>
+    <regex>"signature_id":[[:space:]]*3321272.*Curl User Agent</regex>
+    <description>Suricata: Curl User Agent detected (declassato)</description>
+    <options>no_full_log</options>
+    <group>suricata,ids,policy_violation,</group>
+  </rule>
+
+  <!-- ========================================== -->
+  <!-- SEZIONE 11: APT E MINACCE AVANZATE       -->
+  <!-- ========================================== -->
+
+  <!-- Cobalt Strike detection -->
+  <rule id="110295" level="15">
+    <if_sid>110198</if_sid>
+    <match>Cobalt Strike|CobaltStrike|Beacon</match>
+    <description>Suricata: COBALT STRIKE activity detected!</description>
+    <group>suricata,ids,apt,cobalt_strike,critical,attack,</group>
+  </rule>
+
+  <!-- Metasploit detection -->
+  <rule id="110296" level="13">
+    <if_sid>110198</if_sid>
+    <match>Metasploit|Meterpreter</match>
+    <description>Suricata: METASPLOIT activity detected</description>
+    <group>suricata,ids,metasploit,attack,</group>
+  </rule>
+
+  <!-- Log4j exploitation attempts -->
+  <rule id="110297" level="15">
+    <if_sid>110198</if_sid>
+    <match>Log4j|Log4Shell|JNDI|CVE-2021-44228</match>
+    <description>Suricata: LOG4J exploitation attempt!</description>
+    <group>suricata,ids,log4j,critical,attack,</group>
+  </rule>
+
+  <!-- ========================================== -->
+  <!-- SEZIONE 12: REGOLE DI CORRELAZIONE       -->
+  <!-- ========================================== -->
+
+  <!-- Multiple alerts from same source IP -->
+  <rule id="110273" level="10" frequency="10" timeframe="60">
+    <if_matched_sid>110198</if_matched_sid>
+    <same_source_ip />
+    <description>Suricata: Multiple alerts from same source (10+ in 1min)</description>
+    <group>suricata,ids,correlation,multiple_attacks,</group>
+  </rule>
+
+  <!-- Multiple CRITICAL alerts -->
+  <rule id="110300" level="15" frequency="5" timeframe="120">
+    <if_matched_sid>110200</if_matched_sid>
+    <description>Suricata: Multiple CRITICAL alerts (5+ in 2min)</description>
+    <group>suricata,ids,correlation,critical,multiple_attacks,</group>
+  </rule>
+
+  <!-- Multiple malware detections -->
+  <rule id="110274" level="15" frequency="3" timeframe="60">
+    <if_matched_group>malware</if_matched_group>
+    <description>Suricata: Multiple MALWARE detections (3+ in 1min)</description>
+    <group>suricata,ids,correlation,malware,multiple_attacks,</group>
+  </rule>
+
+  <!-- Multiple attack types from same source -->
+  <rule id="110275" level="13" frequency="5" timeframe="120">
+    <if_matched_sid>110198</if_matched_sid>
+    <same_source_ip />
+    <description>Suricata: Multiple attacks from same source</description>
+    <group>suricata,ids,correlation,persistent_attacker,</group>
+  </rule>
+
+  <!-- ========================================== -->
+  <!-- SEZIONE 13: REGOLA FALLBACK              -->
+  <!-- ========================================== -->
+
+  <!-- Generic fallback for unmatched alerts -->
+  <rule id="110299" level="6">
+    <if_sid>110198</if_sid>
+    <description>Suricata: IDS Alert (uncategorized)</description>
+    <group>suricata,ids,</group>
+  </rule>
+
+</group>
+
+<!-- ========================================================== -->
+<!--  111000-111099: Yara Detecting malware on Linux endpoints  -->
+<!-- ========================================================== -->
+
+<group name="yara,">
+    <!-- Base YARA rule -->
+    <rule id="111000" level="0">
+        <decoded_as>yara_decoder</decoded_as>
+        <description>YARA: Base grouping rule</description>
+    </rule>
+    
+    <!-- YARA scan started -->
+    <rule id="111001" level="3">
+        <if_sid>111000</if_sid>
+        <match>wazuh-yara: INFO - Scan started</match>
+        <description>YARA: Scan initiated for $(yara_scanned_file)</description>
+        <group>yara_scan</group>
+    </rule>
+    
+    <!-- Clean file (no match) -->
+    <rule id="111002" level="3">
+        <if_sid>111000</if_sid>
+        <match>wazuh-yara: INFO - No match found</match>
+        <description>YARA: File clean - $(yara_scanned_file)</description>
+        <group>yara_clean</group>
+    </rule>
+    
+    <!-- Generic malware detection -->
+    <rule id="111010" level="12">
+        <if_sid>111000</if_sid>
+        <match>wazuh-yara: ALERT - Match found</match>
+        <description>YARA MALWARE: $(yara_rule) detected in $(yara_scanned_file)</description>
+        <group>malware,yara_detection,pci_dss_10.6.1,gdpr_IV_35.7.d</group>
+    </rule>
+    
+    <!-- Critical malware (ransomware) -->
+    <rule id="111011" level="15">
+        <if_sid>111010</if_sid>
+        <match>ransomware|ransom|crypto</match>
+        <description>YARA CRITICAL: Ransomware detected - $(yara_rule) in $(yara_scanned_file)</description>
+        <group>ransomware,critical_malware,pci_dss_10.6.1</group>
+    </rule>
+    
+    <!-- Trojan detection -->
+    <rule id="111012" level="13">
+        <if_sid>111010</if_sid>
+        <match>trojan|backdoor|RAT</match>
+        <description>YARA TROJAN: $(yara_rule) detected in $(yara_scanned_file)</description>
+        <group>trojan,malware,pci_dss_10.6.1</group>
+    </rule>
+    
+    <!-- Webshell detection -->
+    <rule id="111013" level="14">
+        <if_sid>111010</if_sid>
+        <match>webshell|web_shell|phpshell</match>
+        <description>YARA WEBSHELL: $(yara_rule) detected in $(yara_scanned_file)</description>
+        <group>webshell,malware,web_attack,pci_dss_10.6.1,pci_dss_11.4</group>
+    </rule>
+    
+    <!-- Cryptocurrency miner -->
+    <rule id="111014" level="11">
+        <if_sid>111010</if_sid>
+        <match>miner|mining|cryptominer|coinminer</match>
+        <description>YARA MINER: Cryptocurrency miner detected - $(yara_rule) in $(yara_scanned_file)</description>
+        <group>crypto_miner,malware,pci_dss_10.6.1</group>
+    </rule>
+    
+    <!-- Exploit/CVE detection -->
+    <rule id="111015" level="14">
+        <if_sid>111010</if_sid>
+        <match>CVE-|exploit|0day|zero-day</match>
+        <description>YARA EXPLOIT: $(yara_rule) detected in $(yara_scanned_file)</description>
+        <group>exploit,attack,pci_dss_10.6.1,pci_dss_11.4</group>
+    </rule>
+    
+    <!-- YARA scan error -->
+    <rule id="111020" level="7">
+        <if_sid>111000</if_sid>
+        <match>wazuh-yara: ERROR</match>
+        <description>YARA: Scan error - $(yara_error)</description>
+        <group>yara_error,scan_failure</group>
+    </rule>
+    
+    <!-- YARA timeout -->
+    <rule id="111021" level="5">
+        <if_sid>111000</if_sid>
+        <match>wazuh-yara: WARNING - Timeout</match>
+        <description>YARA: Scan timeout for $(yara_scanned_file)</description>
+        <group>yara_timeout</group>
+    </rule>
+    
+    <!-- YARA rule compilation error -->
+    <rule id="111022" level="8">
+        <if_sid>111000</if_sid>
+        <match>wazuh-yara: ERROR - Rule compilation failed</match>
+        <description>YARA: Rule compilation error - $(yara_rule_file)</description>
+        <group>yara_error,configuration_error</group>
+    </rule>
+    
+    <!-- Multiple detections in single file -->
+    <rule id="111030" level="14">
+        <if_sid>111010</if_sid>
+        <match>multiple rules matched</match>
+        <description>YARA MULTIPLE: Multiple signatures detected in $(yara_scanned_file)</description>
+        <group>multiple_detection,malware,pci_dss_10.6.1</group>
+    </rule>
+    
+    <!-- Suspicious but not confirmed -->
+    <rule id="111031" level="8">
+        <if_sid>111000</if_sid>
+        <match>wazuh-yara: WARNING - Suspicious</match>
+        <description>YARA SUSPICIOUS: Potentially malicious file - $(yara_scanned_file)</description>
+        <group>suspicious,yara_warning</group>
+    </rule>
+</group>
+
+<!-- File Integrity Monitoring for YARA directories -->
+<group name="syscheck,yara_fim">
+    <!-- YARA rules directory monitoring -->
+    <rule id="111040" level="7">
+        <if_sid>550,553,554</if_sid>
+        <field name="file">/var/ossec/ruleset/yara/</field>
+        <description>YARA: Rule files modified in $(file)</description>
+        <group>yara_rules_changed,configuration_changed</group>
+    </rule>
+    
+    <!-- Quarantine directory monitoring -->
+    <rule id="111041" level="10">
+        <if_sid>554</if_sid>
+        <field name="file">/var/ossec/quarantine/</field>
+        <description>YARA: New file in quarantine - $(file)</description>
+        <group>quarantine,malware_quarantined</group>
+    </rule>
+    
+    <!-- High-risk directories -->
+    <rule id="111042" level="8">
+        <if_sid>554</if_sid>
+        <field name="file">/tmp/|/var/tmp/|/dev/shm/</field>
+        <match>.exe|.dll|.ps1|.sh|.bat</match>
+        <description>YARA FIM: Executable added to temporary directory - $(file)</description>
+        <group>suspicious_file,temp_executable</group>
+    </rule>
+</group>
+
+<!-- Active Response triggers for YARA -->
+<group name="yara,active_response">
+    <!-- Trigger active response for critical malware -->
+    <rule id="111050" level="15">
+        <if_sid>111011,111013,111015</if_sid>
+        <description>YARA AR: Critical threat detected - triggering active response</description>
+        <group>active_response_trigger,critical_malware</group>
+    </rule>
+    
+    <!-- Repeated malware detections -->
+    <rule id="111051" level="13" frequency="3" timeframe="300">
+        <if_matched_sid>111010</if_matched_sid>
+        <same_source_ip />
+        <description>YARA AR: Multiple malware detections from same source</description>
+        <group>multiple_malware,active_response_trigger</group>
+    </rule>
+</group>
+
+<!-- =================================================== -->
+<!--  120000-129999: Persistence & Privilege Escalation  -->
+<!-- =================================================== -->
+<group name="mitre_persistence,mitre_privilege_escalation,">
+
+  <!-- T1547.001 - Registry Run Keys (Event 12) -->
+  <rule id="120001" level="10">
+    <if_group>sysmon_event_12</if_group>
+    <field name="win.eventdata.targetObject" type="pcre2">(?i)\\(currentversion\\run|currentcontrolset\\services)</field>
+    <field name="win.eventdata.details" type="pcre2">(?i)(powershell|cmd|wscript|cscript|mshta|rundll32)</field>
+    <description>Persistence via registry object creation - $(win.eventdata.targetObject)</description>
+    <mitre>
+      <id>T1547.001</id>
+    </mitre>
+  </rule>
+  
+  <!-- T1547.001 - Registry Run Keys (Event 13) -->
+  <rule id="120002" level="10">
+    <if_group>sysmon_event_13</if_group>
+    <field name="win.eventdata.targetObject" type="pcre2">(?i)\\(currentversion\\run|currentcontrolset\\services)</field>
+    <field name="win.eventdata.details" type="pcre2">(?i)(powershell|cmd|wscript|cscript|mshta|rundll32)</field>
+    <description>Persistence via registry value set - $(win.eventdata.targetObject)</description>
+    <mitre>
+      <id>T1547.001</id>
+    </mitre>
+  </rule>
+
+  <!-- T1543.003 - Service Creation -->
+  <rule id="120010" level="11">
+    <if_group>sysmon_event1</if_group>
+    <field name="win.eventdata.image" type="pcre2">(?i)sc\.exe$</field>
+    <field name="win.eventdata.commandLine" type="pcre2">(?i)create.*binpath.*cmd|powershell|rundll32</field>
+    <description>Suspicious service creation with scripting engine</description>
+    <mitre>
+      <id>T1543.003</id>
+    </mitre>
+  </rule>
+
+  <!-- T1548.002 - UAC Bypass -->
+  <rule id="120020" level="10">
+    <if_group>sysmon_event1</if_group>
+    <field name="win.eventdata.parentImage" type="pcre2">(?i)(fodhelper|eventvwr|computerdefaults)\.exe$</field>
+    <field name="win.eventdata.image" type="pcre2">(?i)(cmd|powershell)\.exe$</field>
+    <description>Potential UAC bypass detected</description>
+    <mitre>
+      <id>T1548.002</id>
+    </mitre>
+  </rule>
+
+  <!-- T1574 - DLL Hijacking Detection -->
+  <rule id="120030" level="9">
+    <if_group>sysmon_event7</if_group>
+    <field name="win.eventdata.imageLoaded" type="pcre2">(?i)\\(temp|downloads|appdata\\roaming)\\.*\.dll$</field>
+    <field name="win.eventdata.image" type="pcre2">^(?!.*\\(chrome|firefox|teams|telegram)\.exe)</field>
+    <description>DLL loaded from suspicious location</description>
+    <mitre>
+      <id>T1574.001</id>
+    </mitre>
+  </rule>
+
+</group>
+
+<!-- ======================================== -->
+<!--     130000-139999: Defense Evasion      -->
+<!-- ======================================== -->
+<group name="mitre_defense_evasion,">
+
+  <!-- T1027 - Obfuscated Files or Information -->
+  <rule id="130001" level="11">
+    <if_group>sysmon_event1</if_group>
+    <field name="win.eventdata.commandLine" type="pcre2">(?i)frombase64string|decompress|invoke-expression.*encoding</field>
+    <description>Command obfuscation detected</description>
+    <mitre>
+      <id>T1027</id>
+    </mitre>
+  </rule>
+
+  <!-- T1070.004 - File Deletion -->
+  <rule id="130010" level="7">
+    <if_sid>61616</if_sid> <!-- Sysmon Event 23 generic -->
+    <field name="win.eventdata.image" type="pcre2">(?i)(powershell|cmd|wscript)\.exe$</field>
+    <field name="win.eventdata.targetFilename" type="pcre2">(?i)\.(log|evtx|etl)$</field>
+    <description>Log file deletion attempt by $(win.eventdata.image)</description>
+    <mitre>
+      <id>T1070.004</id>
+    </mitre>
+  </rule>
+
+  <!-- T1036 - Masquerading -->
+  <rule id="130020" level="10">
+    <if_group>sysmon_event1</if_group>
+    <field name="win.eventdata.image" type="pcre2">(?i)\\(temp|downloads|appdata)\\(svchost|explorer|services|lsass)\.exe$</field>
+    <description>Process masquerading as system process from user directory</description>
+    <mitre>
+      <id>T1036.005</id>
+    </mitre>
+  </rule>
+
+  <!-- T1562.001 - Disable Windows Defender -->
+  <rule id="130030" level="12">
+    <if_group>sysmon_event1</if_group>
+    <field name="win.eventdata.commandLine" type="pcre2">(?i)(DisableAntiSpyware|DisableRealtimeMonitoring|Add-MpPreference.*ExclusionPath)</field>
+    <description>Windows Defender tampering detected</description>
+    <mitre>
+      <id>T1562.001</id>
+    </mitre>
+  </rule>
+
+</group>
+
+<!-- ======================================== -->
+<!--     140000-149999: Credential Access    -->
+<!-- ======================================== -->
+<group name="mitre_credential_access,">
+
+  <!-- T1003.001 - LSASS Memory Dump -->
+  <rule id="140001" level="14">
+    <if_group>sysmon_event_10</if_group>
+    <field name="win.eventdata.targetImage" type="pcre2">(?i)lsass\.exe$</field>
+    <field name="win.eventdata.grantedAccess" type="pcre2">0x1F0FFF|0x1F1FFF|0x1F3FFF|0x1FFFFF</field>
+    <field name="win.eventdata.sourceImage" type="pcre2">^(?!.*\\(svchost|csrss|wininit|services)\.exe)</field>
+    <description>LSASS accessed with high privileges by $(win.eventdata.sourceImage)</description>
+    <mitre>
+      <id>T1003.001</id>
+    </mitre>
+  </rule>
+
+  <!-- T1003 - Credential Dumping Tools -->
+  <rule id="140010" level="13">
+    <if_group>sysmon_event1</if_group>
+    <field name="win.eventdata.commandLine" type="pcre2">(?i)(procdump.*lsass|mimikatz|sekurlsa|logonpasswords|pwdump|gsecdump)</field>
+    <description>Credential dumping tool execution detected</description>
+    <mitre>
+      <id>T1003</id>
+    </mitre>
+  </rule>
+
+  <!-- T1552.001 - Credentials in Files -->
+  <rule id="140020" level="9">
+    <if_group>sysmon_event1</if_group>
+    <field name="win.eventdata.commandLine" type="pcre2">(?i)(findstr.*password|select-string.*password|type.*unattend\.xml)</field>
+    <description>Searching for credentials in files</description>
+    <mitre>
+      <id>T1552.001</id>
+    </mitre>
+  </rule>
+
+  <!-- T1555 - Credentials from Web Browsers -->
+  <rule id="140030" level="10">
+    <if_group>sysmon_event_11</if_group>
+    <field name="win.eventdata.targetFilename" type="pcre2">(?i)\\(Chrome|Firefox|Edge)\\User Data\\.*\\Login Data</field>
+    <field name="win.eventdata.image" type="pcre2">^(?!.*\\(chrome|firefox|msedge)\.exe)</field>
+    <description>Browser credential store accessed by non-browser process</description>
+    <mitre>
+      <id>T1555.003</id>
+    </mitre>
+  </rule>
+
+</group>
+
+<!-- ======================================== -->
+<!--  150000-159999: Discovery & Lateral Movement  -->
+<!-- ======================================== -->
+<group name="mitre_discovery,mitre_lateral_movement,">
+
+  <!-- T1057 - Process Discovery -->
+  <rule id="150001" level="6">
+    <if_group>sysmon_event1</if_group>
+    <field name="win.eventdata.image" type="pcre2">(?i)(tasklist|net\s+start|ps|get-process)\.exe$</field>
+    <description>Process discovery activity detected</description>
+    <mitre>
+      <id>T1057</id>
+    </mitre>
+  </rule>
+
+  <!-- T1021.001 - Remote Desktop Protocol -->
+  <rule id="150010" level="9">
+    <if_group>sysmon_event3</if_group>
+    <field name="win.eventdata.destinationPort">3389</field>
+    <field name="win.eventdata.initiated">true</field>
+    <field name="win.eventdata.image" type="pcre2">^(?!.*\\(mstsc|rdpclip)\.exe)</field>
+    <description>Non-standard RDP connection from $(win.eventdata.image)</description>
+    <mitre>
+      <id>T1021.001</id>
+    </mitre>
+  </rule>
+
+  <!-- T1021.002 - SMB/Windows Admin Shares -->
+  <rule id="150020" level="8">
+    <if_group>sysmon_event3</if_group>
+    <field name="win.eventdata.destinationPort">445</field>
+    <field name="win.eventdata.initiated">true</field>
+    <field name="win.eventdata.image" type="pcre2">(?i)(powershell|cmd|wmic|psexec)\.exe$</field>
+    <description>SMB connection from suspicious process - $(win.eventdata.image)</description>
+    <mitre>
+      <id>T1021.002</id>
+    </mitre>
+  </rule>
+
+  <!-- T1018 - Remote System Discovery -->
+  <rule id="150030" level="7">
+    <if_group>sysmon_event1</if_group>
+    <field name="win.eventdata.commandLine" type="pcre2">(?i)(net\s+view|ping\s+-n.*192\.168|nslookup|arp\s+-a)</field>
+    <description>Network discovery commands executed</description>
+    <mitre>
+      <id>T1018</id>
+    </mitre>
+  </rule>
+
+  <!-- T1071 - DNS Query Monitoring -->
+  <rule id="150040" level="6">
+    <if_sid>61644</if_sid> <!-- Sysmon Event 22 generic -->
+    <field name="win.eventdata.queryName" type="pcre2">(?i)\.(tk|ml|ga|cf|top|download|click)$</field>
+    <description>DNS query to suspicious TLD - $(win.eventdata.queryName)</description>
+    <mitre>
+      <id>T1071</id>
+    </mitre>
+  </rule>
+
+</group>
+
+<!-- ======================================== -->
+<!--  160000-169999: Collection & Exfiltration  -->
+<!-- ======================================== -->
+<group name="mitre_collection,mitre_exfiltration,">
+
+  <!-- T1074 - Data Staged -->
+  <rule id="160001" level="9">
+    <if_group>sysmon_event_11</if_group>
+    <field name="win.eventdata.targetFilename" type="pcre2">(?i)\\temp\\.*\.(rar|7z|zip)$</field>
+    <field name="win.eventdata.image" type="pcre2">(?i)(powershell|cmd|wscript)\.exe$</field>
+    <description>Archive created in temp folder by scripting engine</description>
+    <mitre>
+      <id>T1074.001</id>
+    </mitre>
+  </rule>
+
+  <!-- T1005 - Data from Local System -->
+  <rule id="160010" level="8">
+    <if_group>sysmon_event1</if_group>
+    <field name="win.eventdata.commandLine" type="pcre2">(?i)(copy.*\.(doc|xls|pdf)|xcopy.*\/s|robocopy.*\.(doc|xls|pdf))</field>
+    <description>Bulk file copy operation detected</description>
+    <mitre>
+      <id>T1005</id>
+    </mitre>
+  </rule>
+
+  <!-- T1048 - Exfiltration Over Alternative Protocol -->
+  <rule id="160020" level="10">
+    <if_group>sysmon_event3</if_group>
+    <field name="win.eventdata.destinationPort" type="pcre2">^(53|443|8080|8443)$</field>
+    <field name="win.eventdata.image" type="pcre2">(?i)(powershell|cmd|certutil|bitsadmin)\.exe$</field>
+    <field name="win.eventdata.destinationIp" type="pcre2">^(?!10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.)</field>
+    <description>Suspicious outbound connection to external IP</description>
+    <mitre>
+      <id>T1048</id>
+    </mitre>
+  </rule>
+
+</group>
+
+<!-- ======================================== -->
+<!--  170000-179999: Command and Control     -->
+<!-- ======================================== -->
+<group name="mitre_command_control,">
+
+  <!-- T1071.001 - Web Protocols -->
+  <rule id="170001" level="9">
+    <if_group>sysmon_event3</if_group>
+    <field name="win.eventdata.destinationPort" type="pcre2">^(80|443|8080|8443)$</field>
+    <field name="win.eventdata.image" type="pcre2">(?i)\\(temp|downloads|appdata\\roaming)\\.*\.exe$</field>
+    <description>Web connection from suspicious directory</description>
+    <mitre>
+      <id>T1071.001</id>
+    </mitre>
+  </rule>
+
+  <!-- T1090 - Proxy -->
+  <rule id="170010" level="8">
+    <if_group>sysmon_event1</if_group>
+    <field name="win.eventdata.commandLine" type="pcre2">(?i)(netsh.*portproxy|ssh.*\-[RLD]|socat|ngrok)</field>
+    <description>Network tunneling or port forwarding detected</description>
+    <mitre>
+      <id>T1090</id>
+    </mitre>
+  </rule>
+
+  <!-- T1219 - Remote Access Tools -->
+  <rule id="170020" level="11">
+    <if_group>sysmon_event1</if_group>
+    <field name="win.eventdata.image" type="pcre2">(?i)\\(teamviewer|anydesk|logmein|screenconnect|vnc).*\.exe$</field>
+    <field name="win.eventdata.parentImage" type="pcre2">(?i)\\(temp|downloads|appdata)\\</field>
+    <description>Remote access tool started from suspicious location</description>
+    <mitre>
+      <id>T1219</id>
+    </mitre>
+  </rule>
+
+</group>
+
+<!-- ======================================== -->
+<!--         180000-189999: Impact           -->
+<!-- ======================================== -->
+<group name="mitre_impact,">
+
+  <!-- T1486 - Data Encrypted for Impact -->
+  <rule id="180001" level="14">
+    <if_group>sysmon_event_11</if_group>
+    <field name="win.eventdata.targetFilename" type="pcre2">(?i)\.(encrypted|locked|cerber|locky|zepto|crypt)</field>
+    <description>Potential ransomware file extension detected</description>
+    <mitre>
+      <id>T1486</id>
+    </mitre>
+  </rule>
+
+  <!-- T1490 - Inhibit System Recovery -->
+  <rule id="180010" level="13">
+    <if_group>sysmon_event1</if_group>
+    <field name="win.eventdata.commandLine" type="pcre2">(?i)(vssadmin.*delete.*shadows|wbadmin.*delete.*catalog|bcdedit.*recoveryenabled.*no)</field>
+    <description>System recovery tampering detected</description>
+    <mitre>
+      <id>T1490</id>
+    </mitre>
+  </rule>
+
+  <!-- T1489 - Service Stop -->
+  <rule id="180020" level="10">
+    <if_group>sysmon_event1</if_group>
+    <field name="win.eventdata.commandLine" type="pcre2">(?i)net\s+stop\s+(samss|audioendpointbuilder|unistoresvc|sense)</field>
+    <description>Critical service stop attempt</description>
+    <mitre>
+      <id>T1489</id>
+    </mitre>
+  </rule>
+
+</group>
+
+<!-- ======================================== -->
+<!--  190000-199999: Network Security & Firewall  -->
+<!-- ======================================== -->
+<group name="network_security,firewall,">
+
+  <!-- Cisco FTD Optimized Rules -->
+  <!-- SSH Access Denied -->
+  <rule id="190001" level="8">
+    <if_sid>91503</if_sid>
+    <match>710003: TCP access denied</match>
+    <match>/22 </match>
+    <description>Cisco FTD: SSH access denied from $(srcip)</description>
+    <group>access_denied,attack_attempt</group>
+  </rule>
+
+  <!-- Telnet Access Denied -->
+  <rule id="190002" level="8">
+    <if_sid>91503</if_sid>
+    <match>710003: TCP access denied</match>
+    <match>/23 </match>
+    <description>Cisco FTD: Telnet access denied from $(srcip)</description>
+    <group>access_denied,attack_attempt</group>
+  </rule>
+
+  <!-- RDP Access Denied -->
+  <rule id="190003" level="8">
+    <if_sid>91503</if_sid>
+    <match>710003: TCP access denied</match>
+    <match>/3389 </match>
+    <description>Cisco FTD: RDP access denied from $(srcip)</description>
+    <group>access_denied,attack_attempt</group>
+  </rule>
+
+  <!-- SMB Access Denied -->
+  <rule id="190004" level="8">
+    <if_sid>91503</if_sid>
+    <match>710003: TCP access denied</match>
+    <match>/445 </match>
+    <description>Cisco FTD: SMB access denied from $(srcip)</description>
+    <group>access_denied,attack_attempt</group>
+  </rule>
+
+  <!-- NetBIOS Access Denied -->
+  <rule id="190005" level="8">
+    <if_sid>91503</if_sid>
+    <match>710003: TCP access denied</match>
+    <match>/139 </match>
+    <description>Cisco FTD: NetBIOS access denied from $(srcip)</description>
+    <group>access_denied,attack_attempt</group>
+  </rule>
+
+  <!-- RPC Access Denied -->
+  <rule id="190006" level="8">
+    <if_sid>91503</if_sid>
+    <match>710003: TCP access denied</match>
+    <match>/135 </match>
+    <description>Cisco FTD: RPC access denied from $(srcip)</description>
+    <group>access_denied,attack_attempt</group>
+  </rule>
+
+  <!-- Generic TCP Access Denied -->
+  <rule id="190010" level="5">
+    <if_sid>91503</if_sid>
+    <match>710003: TCP access denied</match>
+    <description>Cisco FTD: TCP access denied from $(srcip) to $(dstip)</description>
+    <group>access_denied</group>
+  </rule>
+
+<!-- FortiGate Optimized Rules -->
+  
+  <!-- File inviato alla Sandbox - BASSA PRIORIT� -->
+  <rule id="190019" level="3">
+    <if_sid>81638</if_sid>
+    <match>File submitted to Sandbox</match>
+    <description>FortiGate: File sent to sandbox for analysis - $(data.filename)</description>
+    <group>fortigate,sandbox,info</group>
+    <options>no_full_log</options>
+  </rule>
+  
+  <!-- REGOLE ESISTENTI -->
+  <rule id="190020" level="12">
+    <if_sid>81638</if_sid>
+    <match>action="blocked"</match>
+    <match type="pcre2">fsaverdict="(malicious|suspicious)"</match>
+    <description>FortiGate: Malware blocked - $(filename)</description>
+    <group>virus,blocked</group>
+  </rule>
+  
+  <rule id="190030" level="9">
+    <if_sid>81630</if_sid>
+    <field name="attack" type="pcre2">(?i)(SQL.Injection|Cross.Site.Scripting|Command.Injection)</field>
+    <description>FortiGate: Web application attack blocked - $(attack)</description>
+    <group>web_attack,ips</group>
+  </rule>
+
+  <!-- CSF/LFD Rules -->
+  <rule id="190040" level="10">
+    <program_name>lfd</program_name>
+    <match>(sshd) Failed SSH</match>
+    <description>LFD: SSH brute force - IP $(srcip) blocked</description>
+    <group>authentication_failures,brute_force</group>
+  </rule>
+
+  <rule id="190050" level="8">
+    <program_name>lfd</program_name>
+    <match>*Port Scan* detected</match>
+    <description>LFD: Port scan detected from $(srcip)</description>
+    <group>recon,network_scan</group>
+  </rule>
+
+</group>
+
+<!-- ======================================== -->
+<!--  200000-209999: System Monitoring & FIM  -->
+<!-- ======================================== -->
+<group name="syscheck,system_monitoring,">
+
+  <!-- Critical System File Monitoring -->
+  <rule id="200001" level="10">
+    <if_sid>550,553,554</if_sid>
+    <field name="file" type="pcre2">(?i)(\\system32\\|\\syswow64\\|\/etc\/passwd|\/etc\/shadow)</field>
+    <field name="changed_attributes" type="pcre2">(?i)permission|owner</field>
+    <description>Critical system file modified - $(file)</description>
+    <group>system_file,integrity</group>
+  </rule>
+
+  <!-- Executable in User Directories -->
+  <rule id="200010" level="8">
+    <if_sid>554</if_sid>
+    <field name="file" type="pcre2">(?i)(\\downloads\\|\\desktop\\|\\appdata\\roaming\\).*\.(exe|dll|scr|bat|ps1|vbs)$</field>
+    <description>Executable added to user directory - $(file)</description>
+    <group>suspicious_file</group>
+  </rule>
+
+  <!-- VirusTotal Integration -->
+  <rule id="200020" level="14">
+    <if_sid>87105</if_sid>
+    <field name="virustotal.positives" type="pcre2">^([5-9]|\d{2,})$</field>
+    <description>VirusTotal: MALWARE CONFIRMED - $(file) - Detections: $(virustotal.positives)/$(virustotal.total)</description>
+    <group>malware,virustotal</group>
+  </rule>
+
+  <!-- Audit Commands -->
+  <rule id="200030" level="12">
+    <if_sid>80792</if_sid>
+    <field name="audit.exe" type="pcre2">(?i)(mimikatz|procdump|pwdump|gsecdump|lazagne)</field>
+    <description>Audit: Known malicious tool executed - $(audit.exe)</description>
+    <group>audit_command,malware</group>
+  </rule>
+
+  <!-- Riduce severity per NinjaRMM patching legittimo -->
+  <rule id="200031" level="3">
+    <if_sid>92213</if_sid>
+    <field name="win.eventdata.image">\\NinjaOrbit.exe</field>
+    <description>NinjaRMM Orbit patching activity (reduced severity)</description>
+  </rule>
+
+</group>
+<!-- ====================================================== -->
+<!-- 210000-219999: Whitelisting & False Positive Reduction -->
+<!-- ====================================================== -->
+<group name="whitelist,false_positive_reduction,">
+
+  <!-- Intel Software Whitelist -->
+  <rule id="210001" level="0">
+    <if_group>sysmon</if_group>
+    <field name="win.eventdata.image" type="pcre2">(?i)\\Intel\\.*\\esrv_svc\.exe$</field>
+    <description>Intel SUR service (whitelisted)</description>
+    <options>no_log</options>
+  </rule>
+
+  <!-- Exchange IIS Worker Process -->
+  <rule id="210010" level="0">
+    <if_sid>92151</if_sid>
+    <field name="win.eventdata.image" type="pcre2">(?i)\\inetsrv\\w3wp\.exe$</field>
+    <field name="win.system.computer" type="pcre2">(?i)(EXCH|EXCHANGE)</field>
+    <description>Exchange IIS loading PowerShell (normal)</description>
+    <options>no_log</options>
+  </rule>
+
+  <!-- Browser Temporary Files -->
+  <rule id="210020" level="0">
+    <if_group>sysmon_event_11</if_group>
+    <field name="win.eventdata.image" type="pcre2">(?i)(chrome|msedge|firefox)\.exe$</field>
+    <field name="win.eventdata.targetFilename" type="pcre2">(?i)\\temp\\.*\.(tmp|temp|partial)</field>
+    <description>Browser temporary file (whitelisted)</description>
+    <options>no_log</options>
+  </rule>
+
+  <!-- Communication Software -->
+  <rule id="210030" level="2">
+    <if_group>sysmon_event_10</if_group>
+    <field name="win.eventdata.sourceImage" type="pcre2">(?i)\\(Teams|Zoom|Slack|WebEx|Discord)\\</field>
+    <field name="win.eventdata.grantedAccess" type="pcre2">^(0x1410|0x1000|0x40)$</field>
+    <description>Communication software normal process access</description>
+    <options>no_full_log</options>
+  </rule>
+
+  <!-- Cursor IDE accessing Explorer (legitimate) -->
+  <rule id="210031" level="0">
+    <if_group>sysmon_event_10</if_group>
+    <field name="win.eventdata.sourceImage" type="pcre2">(?i)\\cursor\\Cursor\.exe$</field>
+    <field name="win.eventdata.targetImage" type="pcre2">(?i)\\Explorer\.exe$</field>
+    <field name="win.eventdata.grantedAccess" type="pcre2">^(0x1410|0x1000|0x410)$</field>
+    <description>Cursor IDE accessing Explorer (whitelisted)</description>
+    <options>no_log</options>
+  </rule>
+
+  <!-- Claude Code accessing Explorer (legitimate) -->
+  <rule id="210032" level="0">
+    <if_group>sysmon_event_10</if_group>
+    <field name="win.eventdata.sourceImage" type="pcre2">(?i)\\claude.*\\.*\.exe$</field>
+    <field name="win.eventdata.targetImage" type="pcre2">(?i)\\Explorer\.exe$</field>
+    <field name="win.eventdata.grantedAccess" type="pcre2">^(0x1410|0x1000|0x410)$</field>
+    <description>Claude Code accessing Explorer (whitelisted)</description>
+    <options>no_log</options>
+  </rule>
+
+  <!-- VSCode and Code editors accessing Explorer (legitimate) -->
+  <rule id="210033" level="0">
+    <if_group>sysmon_event_10</if_group>
+    <field name="win.eventdata.sourceImage" type="pcre2">(?i)\\(Microsoft VS Code|Code|VSCodium|Atom|Sublime Text|notepad\+\+)\\.*\.exe$</field>
+    <field name="win.eventdata.targetImage" type="pcre2">(?i)\\Explorer\.exe$</field>
+    <field name="win.eventdata.grantedAccess" type="pcre2">^(0x1410|0x1000|0x410)$</field>
+    <description>Code editor accessing Explorer (whitelisted)</description>
+    <options>no_log</options>
+  </rule>
+
+  <!-- Antivirus Software -->
+  <rule id="210040" level="0">
+    <if_group>sysmon_event_10</if_group>
+    <field name="win.eventdata.sourceImage" type="pcre2">(?i)\\(Windows Defender|MsMpEng|Sophos|Symantec|McAfee|ESET|Kaspersky)\\</field>
+    <description>Antivirus process access (whitelisted)</description>
+    <options>no_log</options>
+  </rule>
+
+  <!-- Database Files -->
+  <rule id="210050" level="0">
+    <if_sid>550,553,554</if_sid>
+    <field name="file" type="pcre2">(?i)(metabase\.db|pg_stat_tmp|websocket_production)</field>
+    <description>Database file modification (whitelisted)</description>
+    <options>no_log</options>
+  </rule>
+
+  <!-- Zone.Identifier ADS -->
+  <rule id="210060" level="0">
+    <if_sid>510</if_sid>
+    <match>:Zone.Identifier</match>
+    <description>Zone.Identifier ADS (whitelisted)</description>
+    <options>no_log</options>
+  </rule>
+
+  <!-- PowerShell Policy Test -->
+  <rule id="210070" level="0">
+    <if_group>sysmon_event_11</if_group>
+    <field name="win.eventdata.targetFilename" type="pcre2">__PSScriptPolicyTest_.*\.ps1$</field>
+    <description>PowerShell policy test file (whitelisted)</description>
+    <options>no_log</options>
+  </rule>
+
+  <!-- Large Event Filtering -->
+  <rule id="210080" level="0">
+    <if_group>sysmon</if_group>
+    <field name="win.eventdata.commandLine" type="pcre2">.{10000,}</field>
+    <description>Command line too long (filtered)</description>
+    <options>no_log</options>
+  </rule>
+
+  <rule id="210081" level="0">
+    <if_group>sysmon_event_10</if_group>
+    <field name="win.eventdata.callTrace" type="pcre2">.{8000,}</field>
+    <description>CallTrace too long (filtered)</description>
+    <options>no_log</options>
+  </rule>
+
+<!-- .NET Compiler creating temporary files - reduced priority -->
+  <rule id="210090" level="3">
+    <if_sid>92213</if_sid>
+    <field name="win.eventdata.image" type="pcre2">(?i)\\csc\.exe$|\\vbc\.exe$|\\msbuild\.exe$</field>
+    <description>Legitimate .NET compiler creating temporary file - $(win.eventdata.targetFilename)</description>
+    <group>sysmon,dotnet_compiler,whitelist</group>
+  </rule>
+
+  <!-- Microsoft development tools - reduced priority -->
+  <rule id="210091" level="2">
+    <if_sid>92213</if_sid>
+    <field name="win.eventdata.image" type="pcre2">(?i)\\microsoft\.net\\framework</field>
+    <field name="win.eventdata.targetFilename" type="pcre2">(?i)\\temp\\.*\.(dll|exe)$</field>
+    <description>Microsoft .NET Framework creating temporary files</description>
+    <group>sysmon,microsoft_dotnet,whitelist</group>
+    <options>no_full_log</options>
+  </rule>
+
+  <!-- Altri compilatori e tool di sviluppo -->
+  <rule id="210092" level="3">
+    <if_sid>92213</if_sid>
+    <field name="win.eventdata.image" type="pcre2">(?i)\\(devenv|cl|link|javac|python|node|npm)\.exe$</field>
+    <description>Development tool creating temporary file - $(win.eventdata.targetFilename)</description>
+    <group>sysmon,development_tools,whitelist</group>
+  </rule>  
+
+<!-- PRTG Network Monitor PowerShell usage - reduced priority -->
+  <rule id="210093" level="3">
+    <if_sid>92151</if_sid>
+    <field name="win.eventdata.image" type="pcre2">(?i)\\PRTG Network Monitor\\.*\.exe$</field>
+    <description>PRTG Network Monitor using PowerShell (legitimate monitoring)</description>
+    <group>sysmon,prtg,monitoring_software,whitelist</group>
+    <options>no_full_log</options>
+  </rule>
+
+<!-- Windows Program Compatibility Assistant - reduced priority -->
+<rule id="210094" level="3">
+  <if_sid>92058</if_sid>
+  <field name="win.eventdata.image" type="pcre2">(?i)\\sdbinst\.exe$</field>
+  <field name="win.eventdata.parentCommandLine" type="pcre2">(?i)svchost\.exe.*PcaSvc</field>
+  <field name="win.eventdata.user" type="pcre2">NT AUTHORITY\\SYSTEM</field>
+  <description>Windows Program Compatibility Assistant legitimate operation</description>
+  <group>sysmon,windows_pcasvc,whitelist</group>
+  <options>no_full_log</options>
+</rule>
+
+<!-- Altri processi Windows legittimi che usano Application Shimming -->
+<rule id="210095" level="2">
+  <if_sid>92058</if_sid>
+  <field name="win.eventdata.commandLine" type="pcre2">(?i)sdbinst\.exe\s+-m\s+-bg</field>
+  <field name="win.eventdata.parentImage" type="pcre2">(?i)\\svchost\.exe$</field>
+  <description>Windows compatibility database background update</description>
+  <group>sysmon,windows_compatibility,whitelist</group>
+  <options>no_log</options>
+</rule>
+
+</group>
+
+<!-- ======================================== -->
+<!--     Global Correlation Rules            -->
+<!-- ======================================== -->
+<group name="correlation,">
+
+  <!-- Multiple Failed Authentication -->
+  <rule id="220001" level="10" frequency="5" timeframe="300">
+    <if_matched_group>authentication_failures</if_matched_group>
+    <same_source_ip />
+    <description>Multiple authentication failures from $(srcip)</description>
+    <group>brute_force</group>
+  </rule>
+
+  <!-- Rapid Process Injection -->
+  <rule id="220010" level="13" frequency="5" timeframe="60">
+    <if_matched_sid>140001</if_matched_sid>
+    <same_field>win.system.computer</same_field>
+    <description>Multiple process injection attempts on $(win.system.computer)</description>
+    <group>process_injection</group>
+  </rule>
+
+  <!-- Multiple Suspicious Processes -->
+  <rule id="220020" level="12" frequency="10" timeframe="300">
+    <if_matched_group>mitre_execution</if_matched_group>
+    <same_field>win.system.computer</same_field>
+    <description>Multiple suspicious process executions on $(win.system.computer)</description>
+    <group>potential_compromise</group>
+  </rule>
+
+</group>
+
+<!-- ======================================== -->
+<!-- VirusTotal File Monitoring Rules -->
+<!-- ======================================== -->
+<group name="virustotal,">
+
+<!-- ======================================== -->
+<!-- Base Detection Rules -->
+<!-- ======================================== -->
+
+<!-- Executable file modified - VirusTotal scan -->
+<rule id="200050" level="7">
+  <if_sid>550</if_sid>
+  <field name="file" type="pcre2">(?i)\.(exe|dll|scr|bat|ps1|vbs|jar|com|cmd|zip|7z|rar|php|asp|aspx|jsp|py|sh|elf|so)$</field>
+  <description>Executable file modified - VirusTotal scan - $(file)</description>
+  <group>syscheck,virustotal,fim_executable</group>
+</rule>
+
+<!-- Executable file permissions changed - VirusTotal scan -->
+<rule id="200053" level="7">
+  <if_sid>550</if_sid>
+  <field name="file" type="pcre2">(?i)\.(exe|dll|scr|bat|ps1|vbs|jar|com|cmd|zip|7z|rar|php|asp|aspx|jsp|py|sh|elf|so)$</field>
+  <field name="changed_attributes" type="pcre2">(?i)permission</field>
+  <description>Executable file permissions changed - VirusTotal scan - $(file)</description>
+  <group>syscheck,virustotal,fim_executable</group>
+</rule>
+
+<!-- Executable file added - VirusTotal scan -->
+<rule id="200054" level="7">
+  <if_sid>554</if_sid>
+  <field name="file" type="pcre2">(?i)\.(exe|dll|scr|bat|ps1|vbs|jar|com|cmd|zip|7z|rar|php|asp|aspx|jsp|py|sh|elf|so)$</field>
+  <description>Executable file added - VirusTotal scan - $(file)</description>
+  <group>syscheck,virustotal,fim_executable</group>
+</rule>
+
+<!-- ======================================== -->
+<!-- Priority Enhancement Rules -->
+<!-- ======================================== -->
+
+<!-- High priority: Suspicious locations -->
+<rule id="200055" level="10">
+  <if_sid>200050,200054</if_sid>
+  <field name="file" type="pcre2">(?i)(\\temp\\|\\tmp\\|\\downloads\\|\\appdata\\roaming\\|\/tmp\/|\/var\/tmp\/|\/dev\/shm\/)</field>
+  <description>Executable in suspicious location - Priority VirusTotal scan - $(file)</description>
+  <group>syscheck,virustotal,fim_executable,priority</group>
+</rule>
+
+<!-- Exclusion for legitimate FinePrint DLLs and EXEs in spool directory -->
+<rule id="200052" level="0">
+  <if_sid>200054</if_sid>
+  <field name="file" type="pcre2">(?i)\\system32\\spool\\.*\\(fp.*\.(dll|exe)|fpp.*\.(dll|exe))</field>
+  <description>FinePrint printer driver files in spool directory - whitelisted</description>
+  <group>whitelist,printer_driver,</group>
+</rule>
+
+<!-- Critical: System directories -->
+<rule id="200057" level="12">
+  <if_sid>200054</if_sid>
+  <field name="file" type="pcre2">(?i)(\\system32\\|\\syswow64\\|\/usr\/bin\/|\/bin\/|\/sbin\/|\\windows\\)</field>
+  <description>CRITICAL: New executable in system directory - $(file)</description>
+  <group>syscheck,virustotal,fim_executable,critical</group>
+</rule>
+
+<!-- High priority: Suspicious filenames -->
+<rule id="200058" level="11">
+  <if_sid>200050,200054</if_sid>
+  <field name="file" type="pcre2">(?i)(svchost|explorer|lsass|services|winlogon|csrss|smss|system).*\.(exe|dll)$</field>
+  <field name="file" type="pcre2">^(?!.*\\(system32|syswow64|windows)\\)</field>
+  <description>Suspicious filename mimicking system process - $(file)</description>
+  <group>syscheck,virustotal,fim_executable,masquerading</group>
+</rule>
+
+<!-- Double extensions -->
+<rule id="200059" level="10">
+  <if_sid>200050,200054</if_sid>
+  <field name="file" type="pcre2">(?i)\.(jpg|jpeg|png|doc|pdf|txt)\.(exe|scr|bat|com|pif)$</field>
+  <description>Double extension detected - possible malware - $(file)</description>
+  <group>syscheck,virustotal,fim_executable,double_extension</group>
+</rule>
+
+<!-- ======================================== -->
+<!-- Web-specific Rules -->
+<!-- ======================================== -->
+
+<!-- PHP webshell detection -->
+<rule id="200056" level="10">
+  <if_sid>554</if_sid>
+  <field name="file" type="pcre2">(?i)\.php$</field>
+  <field name="file" type="pcre2">(?i)(\/var\/www\/|\/home\/.*\/public_html\/|\\inetpub\\wwwroot\\)</field>
+  <field name="file" type="pcre2">^(?!.*(cache|tmp|temp|sessions|compiled|vendor|node_modules))</field>
+  <description>New PHP file in web directory - possible webshell - $(file)</description>
+  <group>syscheck,virustotal,fim_executable,web_shell</group>
+</rule>
+
+<!-- Suspicious web file names -->
+<rule id="200067" level="11">
+  <if_sid>200056</if_sid>
+  <field name="file" type="pcre2">(?i)(shell|c99|r57|b374k|wso|cmd|backdoor|hack|mal|evil|base64)</field>
+  <description>CRITICAL: Suspicious webshell filename detected - $(file)</description>
+  <group>syscheck,virustotal,fim_executable,web_shell,critical</group>
+</rule>
+
+<!-- ======================================== -->
+<!-- Whitelist Rules - Common Software -->
+<!-- ======================================== -->
+
+<!-- Microsoft Office Update Files -->
+<rule id="210025" level="0">
+  <if_sid>200057</if_sid>
+  <field name="file" type="pcre2">(?i)\\microsoft office\\updates\\download\\packagefiles\\</field>
+  <description>Microsoft Office update file installation (whitelisted)</description>
+  <options>no_log</options>
+</rule>
+
+<!-- Microsoft Office Installer Icons and Components -->
+<rule id="210026" level="0">
+  <if_sid>200057</if_sid>
+  <field name="file" type="pcre2">(?i)\\{90160000-.*\\(accicons|dbcicons|grv_icons|joticon|lyncicon|osmclienticon|misc|outicon|pj11icon|pptico|pubs|sscicons|visicon|wordicon|xlicons)\.exe$</field>
+  <description>Microsoft Office installer icon executables (whitelisted)</description>
+  <options>no_log</options>
+</rule>
+
+<!-- Windows Updates -->
+<rule id="200060" level="0">
+  <if_sid>200050,200053,200054</if_sid>
+  <field name="file" type="pcre2">(?i)\\windows\\(servicing|softwaredistribution|winsxs)\\</field>
+  <description>Windows Update files (whitelisted)</description>
+  <options>no_log</options>
+</rule>
+
+<!-- Browser Updates -->
+<rule id="200061" level="0">
+  <if_sid>200050,200053,200054</if_sid>
+  <field name="file" type="pcre2">(?i)(\\google\\chrome\\|\\mozilla firefox\\|\\microsoft\\edge\\|\\opera\\)</field>
+  <description>Browser update (whitelisted)</description>
+  <options>no_log</options>
+</rule>
+
+<!-- Security Software -->
+<rule id="200062" level="0">
+  <if_sid>200050,200053,200054</if_sid>
+  <field name="file" type="pcre2">(?i)(\\windows defender\\|\\malwarebytes\\|\\eset\\|\\kaspersky\\|\\symantec\\|\\mcafee\\|\\sophos\\)</field>
+  <description>Security software update (whitelisted)</description>
+  <options>no_log</options>
+</rule>
+
+<!-- Development Tools -->
+<rule id="200063" level="0">
+  <if_sid>200050,200053,200054</if_sid>
+  <field name="file" type="pcre2">(?i)(\\microsoft visual studio\\|\\jetbrains\\|\\git\\|\\python\\python\d+\\|\\nodejs\\|\\npm\\)</field>
+  <description>Development tool update (whitelisted)</description>
+  <options>no_log</options>
+</rule>
+
+<!-- Remote Access Tools (legitimate) -->
+<rule id="200064" level="0">
+  <if_sid>200050,200053,200054</if_sid>
+  <field name="file" type="pcre2">(?i)\\teamviewer\\.*\.(dll|exe)$</field>
+  <description>TeamViewer update (whitelisted)</description>
+  <options>no_log</options>
+</rule>
+
+<!-- Cache and Temporary Files -->
+<rule id="200065" level="0">
+  <if_sid>200050,200054,200055</if_sid>
+  <field name="file" type="pcre2">(?i)(cache|temp|tmp|\_\_pycache\_\_|node_modules|vendor)</field>
+  <description>Cache/temp file (whitelisted)</description>
+  <options>no_log</options>
+</rule>
+
+<!-- Specific Known Files -->
+<rule id="200066" level="0">
+  <if_sid>200050,200053,200054</if_sid>
+  <field name="file" type="pcre2">(?i)(forticlientems.*webfilter_custom_pages\.zip|matomocache_.*\.php|\\ninjaone\\njdialog\.zip)</field>
+  <description>Known application file (whitelisted)</description>
+  <options>no_log</options>
+</rule>
+
+<!-- Known legitimate vendors -->
+<rule id="200068" level="0">
+  <if_sid>200050,200053,200054</if_sid>
+  <field name="file" type="pcre2">(?i)\\(microsoft|adobe|oracle|intel|nvidia|amd|hp|dell|lenovo|google|mozilla|opera|portrait displays|dropbox)\\</field>
+  <field name="file" type="pcre2">^(?!.*(crack|keygen|patch))</field>
+  <description>Known vendor software (whitelisted)</description>
+  <options>no_log</options>
+</rule>
+
+<!-- ======================================== -->
+<!-- Response Enhancement Rules -->
+<!-- ======================================== -->
+
+<!-- VirusTotal positive detection -->
+<rule id="200070" level="14">
+  <if_sid>87105</if_sid>
+  <field name="virustotal.positives" type="pcre2">^([5-9]|\d{2,})$</field>
+  <description>VirusTotal: MALWARE DETECTED - $(virustotal.positives)/$(virustotal.total) engines - $(file)</description>
+  <group>malware,virustotal,confirmed_malware</group>
+</rule>
+
+<!-- VirusTotal suspicious (1-4 detections) -->
+<rule id="200071" level="10">
+  <if_sid>87105</if_sid>
+  <field name="virustotal.positives" type="pcre2">^[1-4]$</field>
+  <description>VirusTotal: Suspicious file - $(virustotal.positives)/$(virustotal.total) detections - $(file)</description>
+  <group>malware,virustotal,suspicious</group>
+</rule>
+
+<!-- ======================================== -->
+<!-- Correlation Rules -->
+<!-- ======================================== -->
+
+<!-- Multiple executables added in short time -->
+<rule id="200080" level="12" frequency="5" timeframe="300">
+  <if_matched_sid>200054</if_matched_sid>
+  <same_field>agent.id</same_field>
+  <description>Multiple executables added within 5 minutes on $(agent.name)</description>
+  <group>virustotal,correlation,possible_outbreak</group>
+</rule>
+
+<!-- Same file modified repeatedly -->
+<rule id="200081" level="10" frequency="10" timeframe="3600">
+  <if_matched_sid>200050</if_matched_sid>
+  <same_field>file</same_field>
+  <description>File $(file) modified 10+ times in an hour</description>
+  <group>virustotal,correlation,suspicious_activity</group>
+  <options>no_full_log</options>
+</rule>
+
+</group>
+
+<!-- ======================================== -->
+<!--          Process Whitelists              -->
+<!-- ======================================== -->
+<group name="process_whitelists,">
+  <rule id="92911" level="12">
+    <field name="win.system.eventID">10</field>
+    <field name="win.eventdata.targetImage">\\Explorer\.exe$</field>
+    <list field="win.eventdata.sourceImage" lookup="not_match_key">etc/lists/whitelist-processes.cdb</list>
+    <description>Explorer accessed by non-whitelisted executable</description>
+  </rule>
+</group>
+
+<!-- ======================================== -->
+<!--     OVERRIDE DI REGOLE PREDEFINITE      -->
+<!-- ======================================== -->
+<group name="overrides,">
+
+<!-- Override regola 92213 (if_sid: 61612) - troppi falsi positivi -->
+<rule id="92213" level="15" overwrite="yes">
+  <field name="win.eventdata.targetFilename" type="pcre2">(?i)\\Temp\\.*\.(exe|dll|scr|com|bat|cmd|ps1|vbs|msi|jar)$</field>
+  <description>Executable file dropped in Temp folder</description>
+  <mitre>
+    <id>T1105</id>
+  </mitre>
+  <group>sysmon,sysmon_eid11_detections</group>
+</rule>
+
+
+</group>
+
+<!-- ======================================== -->
+<!--      MISP API INTEGRATION RULES         -->
+<!-- ======================================== -->
+<group name="misp_api,threat_intelligence,">
+    
+    <!-- MISP hit on syscheck events -->
+    <rule id="100620" level="14">
+        <if_sid>550,553,554</if_sid>
+        <field name="misp.found">true</field>
+        <description>MISP API: Malicious file detected - $(misp.type): $(misp.value) - File: $(syscheck.path)</description>
+        <group>misp_hit,malware,</group>
+    </rule>
+    
+    <!-- MISP hit on firewall events -->
+    <rule id="100621" level="12">
+        <if_group>firewall</if_group>
+        <field name="misp.found">true</field>
+        <field name="misp.type">ip</field>
+        <description>MISP API: Malicious IP detected - $(misp.value)</description>
+        <group>misp_hit,network_threat,</group>
+    </rule>
+    
+    <!-- MISP hit on DNS events -->
+    <rule id="100622" level="12">
+        <if_group>dns</if_group>
+        <field name="misp.found">true</field>
+        <field name="misp.type">domain</field>
+        <description>MISP API: Malicious domain detected - $(misp.value)</description>
+        <group>misp_hit,dns_threat,</group>
+    </rule>
+    
+    <!-- MISP hit on web events -->
+    <rule id="100623" level="12">
+        <if_group>web</if_group>
+        <field name="misp.found">true</field>
+        <description>MISP API: Malicious URL/domain detected - $(misp.value)</description>
+        <group>misp_hit,web_threat,</group>
+    </rule>
+    
+    <!-- Critical threat level -->
+    <rule id="100624" level="15">
+        <if_sid>100620,100621,100622,100623</if_sid>
+        <field name="misp.threat_level">critical</field>
+        <description>MISP API: CRITICAL threat - $(misp.type): $(misp.value)</description>
+        <group>critical_threat,</group>
+    </rule>
+    
+    <!-- High threat level -->
+    <rule id="100625" level="14">
+        <if_sid>100620,100621,100622,100623</if_sid>
+        <field name="misp.threat_level">high</field>
+        <description>MISP API: HIGH threat - $(misp.type): $(misp.value)</description>
+        <group>high_threat,</group>
+    </rule>
+    
+</group>
+
+<!-- Critical Military/NATO Domain Detection -->
+<group name="misp_critical_domains">
+  
+  <rule id="100630" level="15">
+    <if_sid>100622</if_sid>
+    <field name="misp.value">nato|military|army|navy|airforce|\.mil$|goarmy|usarmy</field>
+    <description>CRITICAL: Military/NATO domain detected - $(misp.value)</description>
+    <group>critical_threat,nation_state,</group>
+  </rule>
+  
+  <rule id="100631" level="15">
+    <if_sid>100622</if_sid>
+    <field name="misp.value">gov\.|government|state\.gov|admin\.ch</field>
+    <description>CRITICAL: Government domain detected - $(misp.value)</description>
+    <group>critical_threat,nation_state,</group>
+  </rule>
+  
+  <!-- FIX: Use if_matched_group instead of multiple if_matched_sid -->
+  <rule id="100632" level="16" frequency="3" timeframe="300">
+    <if_matched_group>nation_state</if_matched_group>
+    <description>CRITICAL: Multiple nation-state IoCs detected</description>
+    <group>multiple_nation_state,</group>
+  </rule>
+  
+</group>
+<!-- End MISP Integration Rules -->
+
+<!-- Exchange Authentication Monitoring Rules -->
+<group name="exchange_auth,">
+  
+  <!-- Exchange Authentication Failure Rule -->
+  <rule id="220030" level="10">
+    <decoded_as>json</decoded_as>
+    <field name="EventID">^4625$</field>
+    <field name="TargetUserName">\.+</field>
+    <match>Exchange|OWA|Outlook Web|EWS|MAPI</match>
+    <description>Exchange authentication failure for user $(TargetUserName) from $(IpAddress)</description>
+    <group>authentication_failed,exchange,</group>
+  </rule>
+  
+  <!-- Multiple Exchange Authentication Failures -->
+  <rule id="220031" level="12" frequency="5" timeframe="120">
+    <if_matched_sid>220030</if_matched_sid>
+    <same_field>TargetUserName</same_field>
+    <description>Multiple Exchange authentication failures for user $(TargetUserName)</description>
+    <group>authentication_failures,brute_force,exchange,</group>
+  </rule>
+  
+  <!-- Exchange Authentication Success -->
+  <rule id="220032" level="3">
+    <decoded_as>json</decoded_as>
+    <field name="EventID">^4624$</field>
+    <field name="TargetUserName">\.+</field>
+    <match>Exchange|OWA|Outlook Web|EWS|MAPI</match>
+    <description>Exchange authentication success for user $(TargetUserName)</description>
+    <group>authentication_success,exchange,</group>
+  </rule>
+  
+</group>
+<!-- End Exchange Authentication Monitoring Rules -->
+
+<!-- PowerShell Audit Log Reconnaissance Detection -->
+<group name="powershell_audit,">
+
+  <!-- Whitelist ADAudit Plus from all domain controllers at base PowerShell level -->
+  <rule id="220037" level="0">
+    <if_sid>91802</if_sid>
+    <field name="win.system.computer" type="pcre2">(?i)(DC\d+|BUSE\d+)\.buonvicini\.local</field>
+    <field name="win.eventdata.scriptBlockText" type="pcre2">(?i)Invoke-Command.*Search-AdminAuditLog.*ResultSize\s+250000</field>
+    <description>ADAudit Plus legitimate audit log collection via Invoke-Command from domain controller - Whitelisted</description>
+    <options>no_full_log</options>
+  </rule>
+
+  <!-- Whitelist ADAudit Plus from all domain controllers BEFORE detection rules -->
+  <rule id="220039" level="0">
+    <if_sid>91822</if_sid>
+    <field name="win.system.computer" type="pcre2">(?i)(DC\d+|BUSE\d+)\.buonvicini\.local</field>
+    <field name="win.eventdata.scriptBlockText" type="pcre2">(?i)Search-AdminAuditLog.*ResultSize\s+250000</field>
+    <description>ADAudit Plus legitimate audit log collection from domain controller - Whitelisted</description>
+    <options>no_full_log</options>
+  </rule>
+  
+  <!-- Detect Search-AdminAuditLog via Invoke-Command -->
+  <rule id="220040" level="14">
+    <if_sid>91822</if_sid>
+    <field name="win.eventdata.scriptBlockText" type="pcre2">(?i)Search-AdminAuditLog</field>
+    <description>CRITICAL: PowerShell Invoke-Command used to search admin audit logs - possible reconnaissance from $(win.system.computer)</description>
+    <group>reconnaissance,audit_log_access,t1087,</group>
+    <mitre>
+      <id>T1087</id>
+      <id>T1059.001</id>
+      <id>T1057</id>
+    </mitre>
+  </rule>
+  
+  <!-- Detect large result size audit queries -->
+  <rule id="220041" level="15">
+    <if_sid>220040</if_sid>
+    <field name="win.eventdata.scriptBlockText" type="pcre2">ResultSize\s*\d{5,}</field>
+    <description>CRITICAL: Large-scale admin audit log extraction detected (>10000 results) from $(win.system.computer)</description>
+    <group>data_exfiltration,audit_log_export,</group>
+    <mitre>
+      <id>T1530</id>
+      <id>T1005</id>
+    </mitre>
+  </rule>
+  
+  <!-- Detect any Search-AdminAuditLog usage -->
+  <!-- Exclusion rule for legitimate Exchange Import-PSSession -->
+  <rule id="220038" level="0">
+    <if_sid>91802</if_sid>
+    <field name="win.eventdata.scriptBlockText" type="pcre2">(?i)Import-PSSession.*Search-AdminAuditLog</field>
+    <field name="win.system.computer" type="pcre2">(?i)(DC\d+|BUSE\d+)\.buonvicini\.local</field>
+    <description>Legitimate Exchange Import-PSSession with Search-AdminAuditLog from domain controllers - whitelisted</description>
+    <group>whitelist,exchange,</group>
+  </rule>
+
+  <rule id="220042" level="12">
+    <if_sid>91802</if_sid>
+    <field name="win.eventdata.scriptBlockText" type="pcre2">(?i)Search-AdminAuditLog</field>
+    <description>PowerShell Search-AdminAuditLog detected - audit log query from $(win.system.computer)</description>
+    <group>audit_log_access,monitoring,</group>
+  </rule>
+  
+  <!-- Multiple audit log searches in short timeframe -->
+  <rule id="220043" level="15" frequency="3" timeframe="300">
+    <if_matched_sid>220040</if_matched_sid>
+    <same_field>win.system.computer</same_field>
+    <description>CRITICAL: Multiple admin audit log searches from $(win.system.computer) - possible data harvesting</description>
+    <group>persistence,reconnaissance,data_harvesting,</group>
+  </rule>
+  
+  <!-- Detect Export operations on audit logs -->
+  <rule id="220044" level="14">
+    <if_sid>91802</if_sid>
+    <field name="win.eventdata.scriptBlockText" type="pcre2">(?i)(Export-Csv|Out-File|ConvertTo-Json|ConvertTo-Xml).*AdminAuditLog</field>
+    <description>ALERT: Admin audit logs being exported to file from $(win.system.computer)</description>
+    <group>data_exfiltration,audit_log_export,</group>
+    <mitre>
+      <id>T1560</id>
+      <id>T1005</id>
+    </mitre>
+  </rule>
+  
+</group>
+<!-- End PowerShell Audit Log Reconnaissance Detection -->
+
+<!-- Software Deployment and Process Manipulation Detection -->
+<group name="software_deployment,">
+
+  <!-- Exclusion for legitimate Intune Management Extension deployments -->
+  <rule id="220049" level="0">
+    <if_sid>91802</if_sid>
+    <field name="win.eventdata.path" type="pcre2">(?i)\\TEMP\\[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}\.ps1</field>
+    <field name="win.eventdata.scriptBlockText" type="pcre2">(?i)(Invoke-CatalogWorkflow|Invoke-DefinitionsFileConsitencyCheck|Get-DefinitionsFromFile)</field>
+    <description>Legitimate Intune Management Extension deployment script - whitelisted</description>
+    <group>whitelist,intune,software_deployment,</group>
+  </rule>
+  
+  <!-- Detect Invoke-Command with Stop-Process -->
+  <rule id="220050" level="13">
+    <if_sid>91822</if_sid>
+    <field name="win.eventdata.scriptBlockText" type="pcre2">(?i)Stop-Process.*-Force</field>
+    <description>ALERT: PowerShell Invoke-Command forcing process termination on $(win.system.computer)</description>
+    <group>process_termination,software_deployment,</group>
+    <mitre>
+      <id>T1489</id>
+      <id>T1059.001</id>
+    </mitre>
+  </rule>
+  
+  <!-- Detect software deployment scripts from TEMP -->
+  <rule id="220051" level="12">
+    <if_sid>91802</if_sid>
+    <field name="win.eventdata.path" type="pcre2">(?i)(\\TEMP\\|\\TMP\\|\\Temp\\)</field>
+    <field name="win.eventdata.scriptBlockText" type="pcre2">(?i)(Install|Deploy|Setup|MSI|\.exe)</field>
+    <description>Software deployment script executed from TEMP directory on $(win.system.computer)</description>
+    <group>software_deployment,temp_execution,</group>
+    <mitre>
+      <id>T1204</id>
+      <id>T1036</id>
+    </mitre>
+  </rule>
+  
+  <!-- Detect Invoke-PreFlight function (software deployment preparation) -->
+  <rule id="220052" level="11">
+    <if_sid>91802</if_sid>
+    <field name="win.eventdata.scriptBlockText" type="pcre2">(?i)Invoke-PreFlight</field>
+    <description>Software deployment pre-flight check detected on $(win.system.computer)</description>
+    <group>software_deployment,deployment_preparation,</group>
+  </rule>
+  
+  <!-- Detect architecture and PE header inspection -->
+  <rule id="220053" level="10">
+    <if_sid>91802</if_sid>
+    <field name="win.eventdata.scriptBlockText" type="pcre2">(?i)(Get-FileArchitecture|PE\sheader|0x00004550|machineType)</field>
+    <description>Binary file architecture inspection detected on $(win.system.computer)</description>
+    <group>reconnaissance,binary_analysis,</group>
+    <mitre>
+      <id>T1082</id>
+    </mitre>
+  </rule>
+  
+  <!-- Detect mass software deployment via Invoke-Command -->
+  <rule id="220054" level="14">
+    <if_sid>91822</if_sid>
+    <field name="win.eventdata.scriptBlockText" type="pcre2">(?i)(BackgroundPatching|ForceClose.*Process|Stop-Process.*Force)</field>
+    <field name="win.eventdata.path" type="pcre2">(?i)\\TEMP\\</field>
+    <description>CRITICAL: Forceful software deployment from TEMP with process termination on $(win.system.computer)</description>
+    <group>software_deployment,forced_installation,suspicious,</group>
+    <mitre>
+      <id>T1072</id>
+      <id>T1489</id>
+    </mitre>
+  </rule>
+  
+  <!-- Multiple software deployments in short time -->
+  <rule id="220055" level="15" frequency="5" timeframe="600">
+    <if_matched_sid>220051</if_matched_sid>
+    <same_field>win.system.computer</same_field>
+    <description>CRITICAL: Multiple software deployments detected on $(win.system.computer) - possible mass deployment</description>
+    <group>mass_deployment,software_deployment,</group>
+  </rule>
+  
+  <!-- Detect system requirements validation bypass -->
+  <rule id="220056" level="12">
+    <if_sid>91802</if_sid>
+    <field name="win.eventdata.scriptBlockText" type="pcre2">(?i)Compare-SystemRequirements.*MinimumOsVersion</field>
+    <description>System requirements validation in deployment script on $(win.system.computer)</description>
+    <group>software_deployment,system_check,</group>
+  </rule>
+  
+</group>
+<!-- End Software Deployment and Process Manipulation Detection -->
+
+<!-- Exchange AD Management and Reconnaissance Detection -->
+<group name="exchange_ad_mgmt,">
+  
+  <!-- Detect Exchange AD Server Settings enumeration -->
+  <rule id="220060" level="13">
+    <if_sid>91822</if_sid>
+    <field name="win.eventdata.scriptBlockText" type="pcre2">(?i)Get-ADServerSettings</field>
+    <field name="win.system.computer" type="pcre2">(?i)EXCH</field>
+    <description>Exchange AD server settings enumeration via Invoke-Command on $(win.system.computer)</description>
+    <group>exchange_recon,ad_enumeration,</group>
+    <mitre>
+      <id>T1087</id>
+      <id>T1069</id>
+    </mitre>
+  </rule>
+  
+  <!-- Detect Organization Management role enumeration -->
+  <rule id="220061" level="14">
+    <if_sid>91822</if_sid>
+    <field name="win.eventdata.scriptBlockText" type="pcre2">(?i)(get-RoleGroup.*Organization\s*Management|Organization\s*Management.*RoleGroup)</field>
+    <description>CRITICAL: Organization Management role group enumeration on $(win.system.computer) - high privilege reconnaissance</description>
+    <group>privilege_escalation,exchange_recon,</group>
+    <mitre>
+      <id>T1078</id>
+      <id>T1087.002</id>
+    </mitre>
+  </rule>
+  
+  <!-- Detect any Exchange role group enumeration -->
+  <rule id="220062" level="12">
+    <if_sid>91822</if_sid>
+    <field name="win.eventdata.scriptBlockText" type="pcre2">(?i)get-RoleGroup</field>
+    <description>Exchange role group enumeration detected on $(win.system.computer)</description>
+    <group>exchange_recon,role_enumeration,</group>
+  </rule>
+  
+  <!-- Multiple Exchange management queries -->
+  <rule id="220063" level="15" frequency="5" timeframe="300">
+    <if_matched_sid>220061</if_matched_sid>
+    <same_field>win.system.computer</same_field>
+    <description>CRITICAL: Multiple Exchange AD management queries from $(win.system.computer) - possible privilege escalation attempt</description>
+    <group>privilege_escalation,persistence,</group>
+  </rule>
+  
+  <!-- Detect Exchange mailbox permission enumeration -->
+  <rule id="220064" level="13">
+    <if_sid>91822</if_sid>
+    <field name="win.eventdata.scriptBlockText" type="pcre2">(?i)(Get-MailboxPermission|Get-MailboxFolderPermission|Get-RecipientPermission)</field>
+    <description>Exchange mailbox permission enumeration on $(win.system.computer)</description>
+    <group>exchange_recon,permission_enumeration,</group>
+    <mitre>
+      <id>T1087</id>
+      <id>T1069.002</id>
+    </mitre>
+  </rule>
+  
+</group>
+<!-- End Exchange AD Management and Reconnaissance Detection -->
+
+<!-- Process Access Whitelist Rules -->
+<group name="process_access_whitelist,">
+  
+  <!-- Whitelist legitimate Zoom access to Explorer -->
+  <rule id="220070" level="0">
+    <if_sid>92910</if_sid>
+    <field name="win.eventdata.sourceImage" type="pcre2">(?i)\\Zoom\\bin\\Zoom\.exe$</field>
+    <field name="win.eventdata.grantedAccess">^0x40$</field>
+    <description>Legitimate Zoom access to Explorer.exe - minimal permissions (0x40)</description>
+    <group>whitelist,zoom,</group>
+  </rule>
+  
+  <!-- High-risk process access to Explorer (not whitelisted) -->
+  <rule id="220071" level="14">
+    <if_sid>92910</if_sid>
+    <field name="win.eventdata.sourceImage" type="pcre2">(?i)\\AppData\\</field>
+    <field name="win.eventdata.grantedAccess" type="pcre2">(?!0x40)</field>
+    <description>HIGH RISK: AppData process accessing Explorer.exe with elevated permissions from $(win.eventdata.sourceImage)</description>
+    <group>process_injection,high_risk,</group>
+    <mitre>
+      <id>T1055</id>
+      <id>T1036</id>
+    </mitre>
+  </rule>
+  
+  <!-- Multiple process access attempts from same source -->
+  <rule id="220072" level="15" frequency="10" timeframe="60">
+    <if_matched_sid>92910</if_matched_sid>
+    <same_field>win.eventdata.sourceImage</same_field>
+    <description>CRITICAL: Multiple process access attempts from $(win.eventdata.sourceImage) - possible injection campaign</description>
+    <group>process_injection,persistence,</group>
+  </rule>
+  
+</group>
+<!-- End Process Access Whitelist Rules -->
+
+<!-- ADAudit Plus Whitelist Rules -->
+<group name="adaudit_plus,windows,powershell,whitelist">
+  
+  <!-- Rule 220080: Whitelist ADAudit Plus legitimate audit log collection from all domain controllers -->
+  <rule id="220080" level="0">
+    <if_sid>220041</if_sid>
+    <field name="win.system.computer" type="pcre2">(?i)(DC\d+|BUSE\d+)\.buonvicini\.local</field>
+    <field name="win.eventdata.scriptBlockText">Search-AdminAuditLog.*ResultSize 250000</field>
+    <description>ADAudit Plus legitimate audit log collection from domain controller - Whitelisted</description>
+    <options>no_full_log</options>
+  </rule>
+
+  <!-- Rule 220081: Whitelist ADAudit Plus audit collection targeting any domain controller -->
+  <rule id="220081" level="0">
+    <if_sid>220041</if_sid>
+    <field name="win.eventdata.scriptBlockText" type="pcre2">Search-AdminAuditLog.*ResultSize 250000.*(DC\d+|BUSE\d+)</field>
+    <description>ADAudit Plus legitimate audit collection targeting domain controller - Whitelisted</description>
+    <options>no_full_log</options>
+  </rule>
+
+  <!-- Rule 220082: Alert on suspicious audit log extraction NOT from ADAudit Plus -->
+  <rule id="220082" level="15">
+    <if_sid>220041</if_sid>
+    <field name="win.eventdata.scriptBlockText" negate="yes">ResultSize 250000</field>
+    <description>CRITICAL: Suspicious admin audit log extraction detected (non-ADAudit pattern)</description>
+    <mitre>
+      <id>T1005</id>
+      <id>T1070.001</id>
+    </mitre>
+  </rule>
+
+  <!-- Rule 220083: Alert on audit extraction with unusual result sizes -->
+  <rule id="220083" level="14">
+    <if_sid>61609</if_sid>
+    <field name="win.eventdata.scriptBlockText">Search-AdminAuditLog.*ResultSize (?!250000)[0-9]{6,}</field>
+    <description>HIGH: Admin audit log extraction with unusual result size detected</description>
+    <mitre>
+      <id>T1005</id>
+    </mitre>
+  </rule>
+
+</group>
+<!-- End ADAudit Plus Whitelist Rules -->
+
+<!-- PrintNightmare/Print Spooler Vulnerability Detection Rules -->
+<group name="printnightmare,syscheck,windows">
+  
+  <!-- Rule 220100: Suspicious DLL in print spooler directory (sx_p2d_client32.dll) -->
+  <rule id="220100" level="14">
+    <if_sid>550,554</if_sid>
+    <field name="file" type="pcre2">(?i)\\windows\\system32\\spool\\drivers\\.*sx_p2d_client32\.dll</field>
+    <description>CRITICAL: Suspicious PrintNightmare-related DLL detected in print spooler directory - $(file)</description>
+    <mitre>
+      <id>T1055</id>
+      <id>T1574.001</id>
+    </mitre>
+    <group>printnightmare,privilege_escalation,attack.t1055</group>
+  </rule>
+
+  <!-- Rule 220101: Any new executable in print spooler drivers directory -->
+  <rule id="220101" level="12">
+    <if_sid>550,554</if_sid>
+    <field name="file" type="pcre2">(?i)\\windows\\system32\\spool\\drivers\\.*\.(dll|exe)$</field>
+    <description>HIGH: New executable detected in print spooler drivers directory - $(file)</description>
+    <mitre>
+      <id>T1055</id>
+      <id>T1574</id>
+    </mitre>
+    <group>printnightmare,suspicious_file</group>
+  </rule>
+
+  <!-- Rule 220102: Frequency rule for multiple print spooler DLL additions -->
+  <rule id="220102" level="15" frequency="3" timeframe="300">
+    <if_matched_sid>220101</if_matched_sid>
+    <description>CRITICAL: Multiple suspicious files added to print spooler directory (possible PrintNightmare attack)</description>
+    <mitre>
+      <id>T1055</id>
+      <id>T1068</id>
+    </mitre>
+    <group>printnightmare,active_attack</group>
+  </rule>
+
+</group>
+<!-- End PrintNightmare Detection Rules -->
+
+<!-- VS Code Server Whitelist Rules -->
+<group name="syscheck,vscode_whitelist">
+
+  <!-- Rule 220110: Whitelist VS Code Server files in .vscode-server directory -->
+  <rule id="220110" level="0">
+    <if_sid>550,554</if_sid>
+    <field name="file" type="pcre2">\.vscode-server/</field>
+    <description>Whitelist: VS Code Server file modification - $(file)</description>
+    <group>vscode,whitelist</group>
+  </rule>
+
+  <!-- Rule 220111: Whitelist VS Code Server CLI files -->
+  <rule id="220111" level="0">
+    <if_sid>550,554</if_sid>
+    <field name="file" type="pcre2">\.vscode-server/cli/servers/.*\.(sh|js|json|node)$</field>
+    <description>Whitelist: VS Code Server CLI file - $(file)</description>
+    <group>vscode,whitelist</group>
+  </rule>
+
+  <!-- Rule 220112: Whitelist VS Code Server extensions -->
+  <rule id="220112" level="0">
+    <if_sid>550,554</if_sid>
+    <field name="file" type="pcre2">\.vscode-server/extensions/</field>
+    <description>Whitelist: VS Code Server extension file - $(file)</description>
+    <group>vscode,whitelist</group>
+  </rule>
+
+  <!-- Rule 220113: Whitelist VS Code installation PowerShell commands -->
+  <rule id="220113" level="0">
+    <if_sid>110002</if_sid>
+    <field name="win.eventdata.commandLine" type="pcre2">(?i)Add-AppxPackage.*Microsoft VS Code.*code_x64\.appx</field>
+    <field name="win.eventdata.parentImage" type="pcre2">(?i)CodeSetup-stable.*\.tmp</field>
+    <description>Whitelist: VS Code installation PowerShell command - $(win.eventdata.user)</description>
+    <group>vscode,whitelist,installation</group>
+  </rule>
+
+  <!-- Rule 220114: Whitelist any VS Code setup related PowerShell -->
+  <rule id="220114" level="0">
+    <if_sid>110001,110002</if_sid>
+    <field name="win.eventdata.parentImage" type="pcre2">(?i)(CodeSetup|VSCodeSetup|code.*setup).*\.(tmp|exe)</field>
+    <description>Whitelist: VS Code setup PowerShell execution - $(win.eventdata.user)</description>
+    <group>vscode,whitelist,setup</group>
+  </rule>
+
+</group>
+<!-- End VS Code Server Whitelist Rules -->
+
+<!-- Admin Audit Log Extraction Detection Rules -->
+<group name="windows,powershell,audit_extraction,attack">
+
+  <!-- Rule 220120: Detect Search-AdminAuditLog execution -->
+  <rule id="220120" level="7">
+    <if_sid>61609</if_sid>
+    <field name="win.eventdata.scriptBlockText" type="pcre2">Search-AdminAuditLog</field>
+    <description>Admin audit log search detected on $(win.system.computer)</description>
+    <mitre>
+      <id>T1005</id>
+      <id>T1087</id>
+    </mitre>
+    <group>reconnaissance,data_collection</group>
+  </rule>
+
+  <!-- Rule 220121: Large-scale admin audit log extraction (>10000 results) -->
+  <rule id="220121" level="14">
+    <if_sid>220120</if_sid>
+    <field name="win.eventdata.scriptBlockText" type="pcre2">ResultSize\s+(?:1[0-9]{4,}|[2-9][0-9]{4,})</field>
+    <description>CRITICAL: Large-scale admin audit log extraction detected (>10000 results) on $(win.system.computer)</description>
+    <mitre>
+      <id>T1005</id>
+      <id>T1530</id>
+    </mitre>
+    <group>data_exfiltration,high_volume_extraction</group>
+  </rule>
+
+  <!-- Rule 220122: Maximum admin audit log extraction (250000 results) -->
+  <rule id="220122" level="15">
+    <if_sid>220120</if_sid>
+    <field name="win.eventdata.scriptBlockText" type="pcre2">ResultSize\s+250000</field>
+    <description>CRITICAL: Maximum admin audit log extraction detected (250000 results) on $(win.system.computer)</description>
+    <mitre>
+      <id>T1005</id>
+      <id>T1530</id>
+    </mitre>
+    <group>data_exfiltration,maximum_extraction</group>
+  </rule>
+
+  <!-- Rule 220123: Multiple audit log extractions in short timeframe -->
+  <rule id="220123" level="13" frequency="3" timeframe="600">
+    <if_matched_sid>220120</if_matched_sid>
+    <same_field>win.system.computer</same_field>
+    <description>HIGH: Multiple admin audit log extractions from $(win.system.computer) (possible data collection)</description>
+    <mitre>
+      <id>T1005</id>
+      <id>T1087</id>
+    </mitre>
+    <group>data_exfiltration,repeated_extraction</group>
+  </rule>
+
+  <!-- Rule 220124: Remote session audit log extraction -->
+  <rule id="220124" level="12">
+    <if_sid>220120</if_sid>
+    <field name="win.eventdata.scriptBlockText" type="pcre2">Invoke-Command.*-Session.*Search-AdminAuditLog</field>
+    <description>HIGH: Remote admin audit log extraction via PowerShell session on $(win.system.computer)</description>
+    <mitre>
+      <id>T1005</id>
+      <id>T1021.006</id>
+    </mitre>
+    <group>remote_execution,data_collection</group>
+  </rule>
+
+</group>
+<!-- End Admin Audit Log Extraction Detection Rules -->
+
+<!-- Software Deployment and Process Termination Detection Rules -->
+<group name="windows,powershell,software_deployment,attack">
+
+  <!-- Rule 220130: PowerShell script execution from TEMP directory -->
+  <rule id="220130" level="7">
+    <if_sid>61609</if_sid>
+    <field name="win.eventdata.path" type="pcre2">(?i)\\TEMP\\|\\TMP\\|\\Temp\\</field>
+    <description>PowerShell script execution from TEMP directory on $(win.system.computer)</description>
+    <mitre>
+      <id>T1059.001</id>
+      <id>T1204</id>
+    </mitre>
+    <group>suspicious_location,temp_execution</group>
+  </rule>
+
+  <!-- Rule 220131: Software deployment script with process management -->
+  <rule id="220131" level="10">
+    <if_sid>220130</if_sid>
+    <field name="win.eventdata.scriptBlockText" type="pcre2">(?i)(Invoke-PreFlight|Stop-Process|Get-Process.*ForceClose)</field>
+    <description>HIGH: Software deployment script with process management from TEMP on $(win.system.computer)</description>
+    <mitre>
+      <id>T1562.001</id>
+      <id>T1055</id>
+    </mitre>
+    <group>deployment_script,process_manipulation</group>
+  </rule>
+
+  <!-- Rule 220132: Forced process termination in deployment script -->
+  <rule id="220132" level="14">
+    <if_sid>220131</if_sid>
+    <field name="win.eventdata.scriptBlockText" type="pcre2">(?i)Stop-Process\s+-Force.*ForceClose.*\$true</field>
+    <description>CRITICAL: Forceful software deployment from TEMP with process termination on $(win.system.computer)</description>
+    <mitre>
+      <id>T1562.001</id>
+      <id>T1489</id>
+    </mitre>
+    <group>forced_deployment,process_termination</group>
+  </rule>
+
+  <!-- Rule 220133: Architecture checking in deployment script -->
+  <rule id="220133" level="8">
+    <if_sid>220130</if_sid>
+    <field name="win.eventdata.scriptBlockText" type="pcre2">(?i)(Get-FileArchitecture|Compare-SystemArchitecture|PE header)</field>
+    <description>Architecture verification in deployment script from TEMP on $(win.system.computer)</description>
+    <mitre>
+      <id>T1082</id>
+      <id>T1057</id>
+    </mitre>
+    <group>system_discovery,deployment_recon</group>
+  </rule>
+
+  <!-- Rule 220134: Multiple deployment attempts from TEMP -->
+  <rule id="220134" level="13" frequency="3" timeframe="300">
+    <if_matched_sid>220131</if_matched_sid>
+    <same_field>win.system.computer</same_field>
+    <description>HIGH: Multiple software deployment attempts from TEMP directory on $(win.system.computer)</description>
+    <mitre>
+      <id>T1059.001</id>
+      <id>T1204</id>
+    </mitre>
+    <group>repeated_deployment,persistence_attempt</group>
+  </rule>
+
+  <!-- Rule 220135: Remote deployment via Invoke-Command -->
+  <rule id="220135" level="12">
+    <if_sid>220131</if_sid>
+    <field name="win.eventdata.scriptBlockText" type="pcre2">(?i)Invoke-Command.*-Session.*Invoke-PreFlight</field>
+    <description>HIGH: Remote software deployment with process termination on $(win.system.computer)</description>
+    <mitre>
+      <id>T1021.006</id>
+      <id>T1072</id>
+    </mitre>
+    <group>remote_deployment,lateral_movement</group>
+  </rule>
+
+</group>
+<!-- End Software Deployment Detection Rules -->
+
+<!-- Firefox/Mozilla Installation Whitelist Rules -->
+<group name="firefox_whitelist,sysmon,windows">
+
+  <!-- Rule 220140: Whitelist Firefox MSI installer dropping files in TEMP -->
+  <rule id="220140" level="0">
+    <if_sid>92213,92207</if_sid>
+    <field name="win.eventdata.image" type="pcre2">(?i)\\WINDOWS\\Installer\\MSI[A-F0-9]+\.tmp</field>
+    <field name="win.eventdata.targetFilename" type="pcre2">(?i)(firefox|mozilla|maintenanceservice|crashreporter|default-browser-agent|pingsender|plugin-container|updater|minidump-analyzer|private_browsing)(\.(exe|dll))?</field>
+    <description>Whitelist: Firefox installation from MSI installer - $(win.eventdata.targetFilename)</description>
+    <group>firefox,whitelist,msi_install</group>
+  </rule>
+
+  <!-- Rule 220141: Whitelist Firefox setup.exe dropping files -->
+  <rule id="220141" level="0">
+    <if_sid>92213,92207</if_sid>
+    <field name="win.eventdata.image" type="pcre2">(?i)\\7zSC[A-F0-9]+\\setup\.exe</field>
+    <field name="win.eventdata.targetFilename" type="pcre2">(?i)(System|CityHash|AccessControl|nsExec|ShellLink|ApplicationID|ServicesHelper|liteFirewall|nsJSON|AppAssocReg)\.dll</field>
+    <description>Whitelist: Firefox setup dropping NSIS installer files - $(win.eventdata.targetFilename)</description>
+    <group>firefox,whitelist,setup</group>
+  </rule>
+
+  <!-- Rule 220142: Whitelist Firefox core files in 7z extraction -->
+  <rule id="220142" level="0">
+    <if_sid>92213</if_sid>
+    <field name="win.eventdata.targetFilename" type="pcre2">(?i)\\7zSC[A-F0-9]+\\core\\(.*\.(dll|exe))</field>
+    <field name="win.eventdata.image" type="pcre2">(?i)\\WINDOWS\\Installer\\MSI[A-F0-9]+\.tmp</field>
+    <description>Whitelist: Firefox core files extraction - $(win.eventdata.targetFilename)</description>
+    <group>firefox,whitelist,7z_extraction</group>
+  </rule>
+
+  <!-- Rule 220143: Whitelist Mozilla maintenance service installer -->
+  <rule id="220143" level="0">
+    <if_sid>92213</if_sid>
+    <field name="win.eventdata.image" type="pcre2">(?i)Mozilla Firefox\\maintenanceservice_installer\.exe</field>
+    <description>Whitelist: Mozilla maintenance service installer activity</description>
+    <group>firefox,whitelist,maintenance_service</group>
+  </rule>
+
+  <!-- Rule 220144: Whitelist Firefox desktop shortcut creation -->
+  <rule id="220144" level="0">
+    <if_sid>92207</if_sid>
+    <field name="win.eventdata.targetFilename" type="pcre2">(?i)\\Users\\Public\\Desktop\\Firefox\.lnk</field>
+    <description>Whitelist: Firefox desktop shortcut creation</description>
+    <group>firefox,whitelist,shortcut</group>
+  </rule>
+
+  <!-- Rule 220145: Whitelist legitimate browser DLLs (Mozilla libs) -->
+  <rule id="220145" level="0">
+    <if_sid>92213</if_sid>
+    <field name="win.eventdata.targetFilename" type="pcre2">(?i)(mozglue|mozavcodec|mozavutil|mozwer|freebl3|nss3|softokn3|lgpllibs|libEGL|libGLESv2|xul|vcruntime|msvcp140|AccessibleMarshal|clearkey|ipcclientcerts|gkcodecs|nssckbi|osclientcerts|wmfclearkey|notificationserver)\.dll</field>
+    <description>Whitelist: Mozilla/Firefox library files - $(win.eventdata.targetFilename)</description>
+    <group>firefox,whitelist,libraries</group>
+  </rule>
+
+</group>
+<!-- End Firefox/Mozilla Installation Whitelist Rules -->
+
+<!-- NinjaOne RMM Whitelist Rules -->
+<group name="ninjaone_whitelist,sysmon,windows">
+
+  <!-- Rule 220150: Whitelist NinjaOne RMM patching operations -->
+  <rule id="220150" level="0">
+    <if_sid>92213,92207</if_sid>
+    <field name="win.eventdata.image" type="pcre2">(?i)\\NinjaRMMAgent\\components\\app-patching-ops\\content\\patches\\</field>
+    <description>Whitelist: NinjaOne RMM patch installation - $(win.eventdata.targetFilename)</description>
+    <group>ninjaone,whitelist,rmm_patching</group>
+  </rule>
+
+  <!-- Rule 220151: Whitelist NinjaOne installer files in TEMP -->
+  <rule id="220151" level="0">
+    <if_sid>92213</if_sid>
+    <field name="win.eventdata.image" type="pcre2">(?i)\\NinjaRMMAgent\\.*\.(exe|msi)</field>
+    <field name="win.eventdata.targetFilename" type="pcre2">(?i)\\Windows\\Temp\\ns[A-F0-9]+\.tmp\\</field>
+    <description>Whitelist: NinjaOne RMM installer activity in TEMP - $(win.eventdata.targetFilename)</description>
+    <group>ninjaone,whitelist,installer</group>
+  </rule>
+
+  <!-- Rule 220152: Whitelist any NinjaRMMAgent component activity -->
+  <rule id="220152" level="0">
+    <if_sid>92213,92207,92211</if_sid>
+    <field name="win.eventdata.image" type="pcre2">(?i)\\ProgramData\\NinjaRMMAgent\\</field>
+    <description>Whitelist: NinjaOne RMM agent component activity</description>
+    <group>ninjaone,whitelist,agent_activity</group>
+  </rule>
+
+  <!-- Rule 220153: Whitelist Notepad++ installation by NinjaOne -->
+  <rule id="220153" level="0">
+    <if_sid>92213</if_sid>
+    <field name="win.eventdata.image" type="pcre2">(?i)npp\.\d+\.\d+\.\d+\.Installer</field>
+    <field name="win.eventdata.targetFilename" type="pcre2">(?i)(System|AccessControl|nsExec|ShellLink|ApplicationID|ServicesHelper)\.dll</field>
+    <description>Whitelist: Notepad++ installation via NinjaOne RMM</description>
+    <group>ninjaone,whitelist,notepadplusplus</group>
+  </rule>
+
+</group>
+<!-- End NinjaOne RMM Whitelist Rules -->
+
+<!-- IIS/Windows Web Server Component Whitelist Rules -->
+<group name="iis_whitelist,sysmon,windows">
+
+  <!-- Rule 220160: Whitelist IIS component installation by TrustedInstaller -->
+  <rule id="220160" level="0">
+    <if_sid>92213</if_sid>
+    <field name="win.eventdata.targetFilename" type="pcre2">(?i)\\windows\\system32\\inetsrv\\</field>
+    <field name="win.eventdata.user" type="pcre2">(?i)NT AUTHORITY\\SYSTEM|TrustedInstaller</field>
+    <description>Whitelist: IIS component installation - $(win.eventdata.targetFilename)</description>
+    <group>iis,whitelist,installation</group>
+  </rule>
+
+  <!-- Rule 220161: Whitelist IIS core components -->
+  <rule id="220161" level="0">
+    <if_sid>92213</if_sid>
+    <field name="win.eventdata.targetFilename" type="pcre2">(?i)\\windows\\system32\\inetsrv\\(iiscore|w3wp|appcmd|iisutil|iisreqs|iisres|iislog|iisvdir|iisadmpwd|iisfcgi|iiscfg|iisconfig|iisrstas|iisw3adm|custerr|httpapi|iiscertprovider)(\.(dll|exe))?</field>
+    <description>Whitelist: IIS core components - $(win.eventdata.targetFilename)</description>
+    <group>iis,whitelist,core_components</group>
+  </rule>
+
+  <!-- Rule 220162: Whitelist IIS module components -->
+  <rule id="220162" level="0">
+    <if_sid>92213</if_sid>
+    <field name="win.eventdata.targetFilename" type="pcre2">(?i)\\windows\\system32\\inetsrv\\(hwebcore|webengine4|cachhttp|cachuri|cachtokn|cachfile|compdyn|compstat|dirlist|modrqflt|static|protsup|redirect|authanon|authbas|authcert|authdig|authmap|authsspi|custmeta|dirbrows|loghttp|logerr|defdoc|httpmib|iiswmi|isapi|filter|cgi|fastcgi|wmsvc|iissuba|iisetw|validcfg|nativerd|rewrite|iiswsock|httpsys|tracemodule|iis_ssi|webdav|aspnetcore|aspnetcorev2)(\.(dll|exe))?</field>
+    <description>Whitelist: IIS module components - $(win.eventdata.targetFilename)</description>
+    <group>iis,whitelist,modules</group>
+  </rule>
+
+  <!-- Rule 220163: Whitelist IIS configuration and metadata files -->
+  <rule id="220163" level="0">
+    <if_sid>92213</if_sid>
+    <field name="win.eventdata.targetFilename" type="pcre2">(?i)\\windows\\system32\\inetsrv\\config\\</field>
+    <field name="win.eventdata.user" type="pcre2">(?i)NT AUTHORITY\\SYSTEM|TrustedInstaller</field>
+    <description>Whitelist: IIS configuration files - $(win.eventdata.targetFilename)</description>
+    <group>iis,whitelist,configuration</group>
+  </rule>
+
+  <!-- Rule 220164: Whitelist IIS language/localization resources -->
+  <rule id="220164" level="0">
+    <if_sid>92213</if_sid>
+    <field name="win.eventdata.targetFilename" type="pcre2">(?i)\\windows\\system32\\inetsrv\\[a-z]{2}-[A-Z]{2}\\</field>
+    <description>Whitelist: IIS language resources - $(win.eventdata.targetFilename)</description>
+    <group>iis,whitelist,localization</group>
+  </rule>
+
+  <!-- Rule 220165: Whitelist .NET Framework components for IIS -->
+  <rule id="220165" level="0">
+    <if_sid>92213</if_sid>
+    <field name="win.eventdata.targetFilename" type="pcre2">(?i)\\windows\\Microsoft\.NET\\Framework(64)?\\v[0-9\.]+\\aspnet_.*\.(dll|exe)</field>
+    <field name="win.eventdata.user" type="pcre2">(?i)NT AUTHORITY\\SYSTEM|TrustedInstaller</field>
+    <description>Whitelist: .NET Framework components for IIS - $(win.eventdata.targetFilename)</description>
+    <group>iis,whitelist,dotnet</group>
+  </rule>
+
+</group>
+<!-- End IIS/Windows Web Server Component Whitelist Rules -->
+
+<!-- Rootcheck False Positive Whitelist Rules -->
+<group name="rootcheck_whitelist,ossec">
+
+  <!-- Rule 220200: Whitelist diff utility false positive -->
+  <rule id="220200" level="0">
+    <if_sid>510</if_sid>
+    <regex>/bin/diff|/usr/bin/diff</regex>
+    <description>Whitelist: Known false positive for diff utility</description>
+    <group>rootcheck,whitelist,false_positive</group>
+  </rule>
+
+</group>
+<!-- End Rootcheck False Positive Whitelist Rules -->
+
+<!-- PsShutdown Scheduled Shutdown Whitelist Rules -->
+<group name="psshutdown_whitelist,windows,sysmon">
+
+  <!-- Rule 220210: Whitelist PsShutdown service for scheduled domain shutdown at 22:00 -->
+  <rule id="220210" level="0">
+    <if_sid>92650</if_sid>
+    <field name="win.eventdata.serviceName">PsShutdown</field>
+    <field name="win.eventdata.imagePath" type="pcre2">(?i)%SystemRoot%\\\\PSSDNSVC\.EXE</field>
+    <time>10:00 pm - 10:05 pm</time>
+    <description>Whitelist: Scheduled PsShutdown service for domain-wide shutdown at 22:00</description>
+    <group>psshutdown,whitelist,scheduled_shutdown</group>
+  </rule>
+
+  <!-- Rule 220211: Whitelist PsShutdown service without time restriction (if needed) -->
+  <rule id="220211" level="0">
+    <if_sid>92650</if_sid>
+    <field name="win.eventdata.serviceName">PsShutdown</field>
+    <field name="win.eventdata.imagePath" type="pcre2">(?i)%SystemRoot%\\\\PSSDNSVC\.EXE</field>
+    <field name="win.system.computer" type="pcre2">\.buonvicini\.local$</field>
+    <description>Whitelist: PsShutdown service on buonvicini.local domain computers</description>
+    <group>psshutdown,whitelist,domain_shutdown</group>
+  </rule>
+
+</group>
+<!-- End PsShutdown Scheduled Shutdown Whitelist Rules -->
+
+<!-- NinjaOne RMM Software Deployment Whitelist Rules -->
+<group name="ninjaone_whitelist,">
+  
+  <!-- Rule 220220: Whitelist NinjaOne RMM software deployment PowerShell scripts from TEMP -->
+  <rule id="220220" level="0">
+    <if_sid>220051</if_sid>
+    <field name="win.eventdata.image" type="pcre2">(?i)powershell\.exe</field>
+    <field name="win.eventdata.commandLine" type="pcre2">(?i)NinjaRMMAgent|Stop-Process.*-Force|Install-Application</field>
+    <field name="win.eventdata.currentDirectory" type="pcre2">(?i)C:\\WINDOWS\\TEMP</field>
+    <description>Whitelist: NinjaOne RMM software deployment PowerShell scripts from TEMP</description>
+    <group>ninjaone,rmm,whitelist,software_deployment</group>
+  </rule>
+
+  <!-- Rule 220221: Whitelist NinjaOne RMM PowerShell script execution with GUID names -->
+  <rule id="220221" level="0">
+    <if_sid>220054</if_sid>
+    <field name="win.eventdata.originalFileName" type="pcre2">(?i)PowerShell\.EXE</field>
+    <field name="win.eventdata.commandLine" type="pcre2">(?i)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.ps1</field>
+    <field name="win.eventdata.parentImage" type="pcre2">(?i)NinjaRMMAgent</field>
+    <description>Whitelist: NinjaOne RMM PowerShell script execution with GUID-based script names</description>
+    <group>ninjaone,rmm,whitelist,powershell</group>
+  </rule>
+
+  <!-- Rule 220222: Whitelist NinjaOne RMM process termination commands -->
+  <rule id="220222" level="0">
+    <if_sid>220055</if_sid>
+    <field name="win.eventdata.parentImage" type="pcre2">(?i)NinjaRMMAgent|powershell\.exe</field>
+    <field name="win.eventdata.commandLine" type="pcre2">(?i)Stop-Process.*-Force|taskkill.*\/F</field>
+    <field name="win.eventdata.currentDirectory" type="pcre2">(?i)C:\\WINDOWS\\TEMP</field>
+    <description>Whitelist: NinjaOne RMM forced process termination during software deployment</description>
+    <group>ninjaone,rmm,whitelist,process_termination</group>
+  </rule>
+
+  <!-- Rule 220223: Generic whitelist for NinjaOne PowerShell deployment scripts -->
+  <rule id="220223" level="0">
+    <if_group>sysmon_event1</if_group>
+    <field name="win.eventdata.image" type="pcre2">(?i)powershell\.exe</field>
+    <field name="win.eventdata.commandLine" type="pcre2">(?i)C:\\WINDOWS\\TEMP\\[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.ps1</field>
+    <description>Whitelist: NinjaOne PowerShell deployment scripts with GUID names from TEMP</description>
+    <group>ninjaone,rmm,whitelist,powershell,software_deployment</group>
+  </rule>
+
+</group>
+<!-- End NinjaOne RMM Software Deployment Whitelist Rules -->
+
+<!-- End of local_rules.xml -->

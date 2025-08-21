@@ -43,6 +43,39 @@ systemctl restart wazuh-manager
 - 220100-220199: Application-specific whitelist rules  
 - 220200-220299: System and utility whitelist rules
 
+## Setup
+
+### Initial GitHub Setup
+```bash
+./setup-github.sh
+```
+
+### Automatic Sync Setup
+```bash
+./setup-cron.sh
+```
+
+## Scripts
+
+- `sync-rules.sh` - Sync local_rules.xml from Wazuh to GitHub
+- `deploy-rules.sh` - Deploy rules from GitHub to Wazuh
+- `setup-github.sh` - Configure GitHub repository
+- `setup-ssh-github.sh` - Set up SSH authentication
+- `setup-cron.sh` - Configure automatic synchronization
+
+## Manual Operations
+
+### Push changes to GitHub
+```bash
+./sync-rules.sh
+```
+
+### Pull and deploy from GitHub
+```bash
+git pull origin master
+./deploy-rules.sh
+```
+
 ## Recent Changes
 
 - Added NinjaOne RMM whitelist rules (220220-220223)

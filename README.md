@@ -19,7 +19,7 @@
 
 ## 🎯 Overview
 
-This repository contains custom Wazuh SIEM rules and agent configurations for the **buonvicini.local** domain infrastructure. It provides centralized management, version control, and automated synchronization for all Wazuh security configurations.
+This repository contains custom Wazuh SIEM rules and agent configurations for enterprise infrastructure. It provides centralized management, version control, and automated synchronization for all Wazuh security configurations.
 
 ### Key Features
 - 🛡️ **Custom Security Rules**: Detection and whitelist rules for various threats and legitimate software
@@ -98,8 +98,8 @@ The scripts use the following paths (can be modified in scripts):
 
 ### Git Configuration
 ```bash
-git config --global user.name "paolokappa"
-git config --global user.email "kappa@goline.ch"
+git config --global user.name "your-username"
+git config --global user.email "your-email@example.com"
 ```
 
 ## 📖 Usage
@@ -372,12 +372,11 @@ ls -la /var/ossec/backup/
 ### Resources
 - **Wazuh Documentation**: https://documentation.wazuh.com/
 - **Repository**: https://github.com/paolokappa/wazuh-siem-rules
-- **Wazuh Manager**: soc.goline.ch
+- **Wazuh Manager**: Your SOC platform
 
 ### Contact
-- **Administrator**: paolokappa
-- **Email**: kappa@goline.ch
-- **Domain**: buonvicini.local
+- **Administrator**: Security Team
+- **Organization**: GOLINE SA
 
 ---
 
@@ -396,4 +395,4 @@ All rights reserved. Not for public distribution.
 
 *Last Updated: August 2025*
 *Version: 1.0.0*
-*Maintained by: SOC Team - buonvicini.local*
+*Maintained by: SOC Team - GOLINE SA*

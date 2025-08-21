@@ -17,11 +17,14 @@ Thumbs.db
 *.log
 
 # SENSITIVE - Internal scripts only (DO NOT COMMIT)
-scripts/fetch-sysmon-from-dc.sh
-scripts/windows-dc-sysmon-sync.ps1
-scripts/*-from-dc.sh
-scripts/*-internal.sh
-scripts/*-private.*
+scripts/
+sync-rules.sh
+deploy-rules.sh
+setup-*.sh
+*-sync-*.sh
+*-sync-*.ps1
+fetch-*.sh
+auto-*.sh
 
 # SENSITIVE - Sync metadata with infrastructure details
 sysmon/last_sync.txt

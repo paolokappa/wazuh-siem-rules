@@ -136,28 +136,97 @@ ls -la /root/wazuh-rules-repo/.git/FETCH_HEAD
 
 ### Rule ID Ranges
 
-| Range | Category | Description |
-|-------|----------|-------------|
-| 220000-220099 | General Security | Base security detection rules |
-| 220100-220199 | Application Whitelist | Legitimate software whitelist rules |
-| 220200-220299 | System Whitelist | System utilities and OS component whitelist |
+| Range | Category | Description | Count |
+|-------|----------|-------------|-------|
+| 100200-100999 | Initial Access & System Monitoring | Base security rules, file integrity monitoring | 19 rules |
+| 110001-110999 | Threat Detection | Suricata IDS, malware, exploits, network threats | 71 rules |
+| 111000-111999 | Critical Alerts | High-priority security events | 19 rules |
+| 120000-120999 | Cisco FTD | Cisco Firepower Threat Defense rules | 5 rules |
+| 130000-130999 | FortiGate | FortiGate firewall rules | 4 rules |
+| 140000-140999 | CSF/LFD | ConfigServer Security & Firewall rules | 4 rules |
+| 150000-150999 | Process Monitoring | Process creation and manipulation | 5 rules |
+| 160000-160999 | YARA Integration | YARA malware scanning rules | 3 rules |
+| 170000-170999 | DLL Hijacking | T1574 DLL side-loading detection | 3 rules |
+| 180000-180999 | DNS Monitoring | T1071 DNS query analysis | 3 rules |
+| 190000-190999 | MISP Integration | Threat intelligence from MISP | 12 rules |
+| 200000-209999 | System Monitoring & FIM | File integrity and system monitoring | 27 rules |
+| 210000-219999 | Whitelisting | False positive reduction | 21 rules |
+| 220000-220299 | Custom Security Rules | Application-specific detection and whitelist | 76 rules |
 
-### Current Rule Categories
+### Complete Rule Categories
 
-#### 🔍 Detection Rules
-- **PrintNightmare Detection** (220100-220102): Detects PrintNightmare vulnerability exploitation
-- **Admin Audit Log Extraction** (220120-220124): Monitors suspicious audit log exports
-- **Software Deployment Monitoring** (220130-220135): Tracks software installation from TEMP
-- **PowerShell Reconnaissance** (220040-220044): Detects PowerShell-based enumeration
+#### 🛡️ Core Security Monitoring (100xxx)
+- **File Integrity Monitoring**: Ignore logs, temp files, cache
+- **Linux Audit**: System call monitoring
+- **Windows Audit**: Security event correlation
+- **Authentication**: Failed login tracking
 
-#### ✅ Whitelist Rules
-- **VS Code Server** (220110-220114): Legitimate VS Code remote development
-- **NinjaOne RMM** (220131-220135, 220220-220223): RMM tool operations
-- **Firefox Installation** (220140-220145): Browser deployment
-- **IIS Components** (220160-220165): Web server management
-- **ADAudit Plus** (220037-220039, 220080-220083): Audit tool operations
-- **PsShutdown** (220210-220211): Scheduled shutdown operations
-- **System Utilities** (220200): diff command false positives
+#### 🔍 Threat Detection (110xxx)
+- **Suricata IDS Integration**:
+  - ET TROJAN detection (110240)
+  - ET MALWARE detection (110241)
+  - ET EXPLOIT attempts (110242)
+  - ET CNC communication (110243)
+  - ET SCAN detection (110244)
+  - ET POLICY violations (110245)
+- **Network Threats**: Port scans, suspicious connections
+- **Web Application Attacks**: SQL injection, XSS attempts
+
+#### 🚨 Critical Security Events (111xxx)
+- **Military/NATO Domain Detection**: Critical infrastructure monitoring
+- **Data Exfiltration**: Large-scale data transfers
+- **Advanced Persistent Threats**: Long-term compromise indicators
+
+#### 🔥 Firewall Integration (120xxx-140xxx)
+- **Cisco FTD Rules**: Threat detection from Cisco Firepower
+- **FortiGate Rules**: FortiGate security events
+- **CSF/LFD Rules**: Linux firewall and login failure daemon
+
+#### 🔬 Advanced Detection (150xxx-180xxx)
+- **Process Monitoring**: Suspicious process creation
+- **YARA Scanning**: Malware signature matching
+- **DLL Hijacking Detection**: T1574 technique monitoring
+- **DNS Query Analysis**: T1071 application layer protocol
+
+#### 🌐 Threat Intelligence (190xxx)
+- **MISP Integration**: External threat feed correlation
+- **VirusTotal Monitoring**: File reputation checking
+- **IOC Matching**: Indicators of compromise detection
+
+#### 📁 System & File Monitoring (200xxx)
+- **Critical System Files**: OS file modifications
+- **Configuration Changes**: System setting alterations
+- **Registry Monitoring**: Windows registry changes
+- **Service Modifications**: Service creation/modification
+
+#### ✅ Whitelisting & False Positive Reduction (210xxx)
+- **Intel Software**: Intel driver and management tools
+- **Common Software**: Legitimate application behaviors
+- **System Processes**: Normal OS operations
+
+#### 🎯 Custom Application Rules (220xxx)
+
+##### Detection Rules (220000-220099)
+- **PowerShell Audit Log Reconnaissance** (220040-220044)
+- **Admin Audit Log Extraction** (220041, 220120-220124)
+- **Software Deployment from TEMP** (220050-220055)
+- **Exchange AD Management** (220060-220064)
+- **Process Access Monitoring** (220070-220074)
+
+##### Application Whitelist Rules (220100-220199)
+- **PrintNightmare Detection** (220100-220102)
+- **VS Code Server** (220110-220114)
+- **Admin Audit Extraction** (220120-220124)
+- **NinjaOne RMM** (220130-220135)
+- **Firefox Installation** (220140-220145)
+- **IIS Components** (220160-220165)
+- **Process Access Whitelist** (220170-220174)
+
+##### System Whitelist Rules (220200-220299)
+- **Rootcheck False Positives** (220200)
+- **PsShutdown Scheduled Tasks** (220210-220211)
+- **NinjaOne Deployment Scripts** (220220-220223)
+- **ADAudit Plus Operations** (220037-220039, 220080-220083)
 
 ### Rule Examples
 

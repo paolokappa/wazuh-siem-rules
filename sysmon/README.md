@@ -10,22 +10,18 @@ This directory contains the Sysmon configuration used across Windows endpoints i
 
 ## 🔄 Synchronization Methods
 
-### Method 1: Direct from Windows Server
-Run on Windows Server with Git installed:
-```powershell
-# One-time setup
-cd C:\GitRepos
-git clone git@github.com:paolokappa/wazuh-siem-rules.git
-
-# Regular sync (add to Task Scheduler)
-C:\GitRepos\wazuh-siem-rules\scripts\windows-sync-sysmon.ps1
-```
-
-### Method 2: Via Wazuh Manager
-Run on Wazuh Manager:
+### Method 1: Manual Copy and Sync
+1. Copy Sysmon config from your Windows environment
+2. Place it in `/root/wazuh-rules-repo/sysmon/sysmon_config.xml`
+3. Run the sync script:
 ```bash
-/root/wazuh-rules-repo/scripts/fetch-sysmon-from-windows.sh <server-ip> <username>
+cd /root/wazuh-rules-repo
+./sync-rules.sh
 ```
+
+### Method 2: Internal Scripts (Not Published)
+Internal synchronization scripts are maintained separately for security reasons.
+Contact your system administrator for access to automated sync scripts.
 
 ### Method 3: Manual Copy
 1. Copy `C:\ProgramData\Sysmon\sysmon_config.xml` from Windows

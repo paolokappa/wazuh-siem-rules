@@ -15,3 +15,16 @@ Thumbs.db
 
 # Logs
 *.log
+
+# SENSITIVE - Internal scripts only (DO NOT COMMIT)
+scripts/fetch-sysmon-from-dc.sh
+scripts/windows-dc-sysmon-sync.ps1
+scripts/*-from-dc.sh
+scripts/*-internal.sh
+scripts/*-private.*
+
+# Credentials and sensitive configs
+*.key
+*.pem
+credentials.txt
+passwords.txt

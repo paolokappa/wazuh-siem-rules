@@ -24,6 +24,12 @@ for group in Linux Windows_PC Windows_DC_Servers Windows_Servers; do
     fi
 done
 
+# Sync Sysmon configuration if it exists locally
+if [ -f "$REPO_DIR/sysmon/sysmon_config.xml" ]; then
+    echo "Sysmon configuration found in repository"
+    # The file is already in the repo, will be included in commit
+fi
+
 # Check for other shared groups
 echo "Checking for additional shared groups..."
 for dir in /var/ossec/etc/shared/*/; do

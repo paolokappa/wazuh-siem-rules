@@ -72,7 +72,7 @@ systemctl restart wazuh-manager
 
 ### Pull and deploy from GitHub
 ```bash
-git pull origin master
+git pull origin main
 ./deploy-rules.sh
 ```
 

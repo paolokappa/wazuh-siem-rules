@@ -66,12 +66,12 @@ Source: $WAZUH_RULES"
 # Push to GitHub if remote exists
 if git remote | grep -q origin; then
     echo "Pushing to GitHub..."
-    git push origin master
+    git push origin main
     echo "Successfully pushed to GitHub"
 else
     echo "No remote origin configured. To push to GitHub, run:"
     echo "  git remote add origin <your-github-repo-url>"
-    echo "  git push -u origin master"
+    echo "  git push -u origin main"
 fi
 
 echo "=== Sync completed ==="

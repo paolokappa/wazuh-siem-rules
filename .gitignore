@@ -23,8 +23,16 @@ scripts/*-from-dc.sh
 scripts/*-internal.sh
 scripts/*-private.*
 
+# SENSITIVE - Sync metadata with infrastructure details
+sysmon/last_sync.txt
+sysmon/dc_info.txt
+sysmon/version.txt
+*/last_sync.txt
+
 # Credentials and sensitive configs
 *.key
 *.pem
 credentials.txt
 passwords.txt
+*credentials*
+.env-*

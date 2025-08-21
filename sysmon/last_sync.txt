@@ -1,7 +1,0 @@
-Last fetched from: BUSE005.buonvicini.local
-Source path: \\BUSE005\NETLOGON\Tools\Sysmon\sysmon_config.xml
-Fetch time: 2025-08-21 23:58:00
-Fetch method: SMB with ldapuser credentials
-File size: 422K
-Total lines: 5773
-Organization: GOLINE SA

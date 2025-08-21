@@ -5,8 +5,6 @@ This directory contains the Sysmon configuration used across Windows endpoints i
 ## 📁 Files
 
 - `sysmon_config.xml` - Main Sysmon configuration file
-- `version.txt` - Current Sysmon version
-- `last_sync.txt` - Last synchronization metadata
 
 ## 🔄 Synchronization Methods
 
@@ -23,29 +21,9 @@ cd /root/wazuh-rules-repo
 Internal synchronization scripts are maintained separately for security reasons.
 Contact your system administrator for access to automated sync scripts.
 
-### Method 3: Manual Copy
-1. Copy `C:\ProgramData\Sysmon\sysmon_config.xml` from Windows
-2. Place in `/root/wazuh-rules-repo/sysmon/` on Wazuh Manager
-3. Run sync script: `/root/wazuh-rules-repo/sync-rules.sh`
-
-## 📅 Automated Sync Setup
-
-### Windows Task Scheduler (Recommended)
-Create a scheduled task on your Windows Server:
-
-1. Open Task Scheduler
-2. Create Basic Task
-3. Name: "Sysmon Config GitHub Sync"
-4. Trigger: Daily at 02:00 AM (or your preference)
-5. Action: Start a program
-6. Program: `powershell.exe`
-7. Arguments: `-ExecutionPolicy Bypass -File "C:\GitRepos\wazuh-siem-rules\scripts\windows-sync-sysmon.ps1"`
-
-### Linux Cron (Alternative)
-Add to Wazuh Manager crontab:
-```bash
-0 2 * * * /root/wazuh-rules-repo/scripts/fetch-sysmon-from-windows.sh server-ip username
-```
+### Method 3: Automated Sync
+Automated synchronization is configured separately for security reasons.
+Contact your system administrator for internal sync procedures.
 
 ## 🔧 Configuration Management
 

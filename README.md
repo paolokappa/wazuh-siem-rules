@@ -1,8 +1,16 @@
-# Wazuh SIEM Rules Repository
+# 🛡️ SENTINEL-X: Enterprise Security Rules Engine
+### Advanced Wazuh SIEM Detection & Response Framework
 
 [![Wazuh](https://img.shields.io/badge/Wazuh-4.12-blue)](https://wazuh.com/)
-[![License](https://img.shields.io/badge/License-Private-red)](LICENSE)
+[![Rules](https://img.shields.io/badge/Rules-270%2B-orange)](https://github.com/paolokappa/wazuh-siem-rules)
+[![MITRE ATT&CK](https://img.shields.io/badge/MITRE-ATT%26CK-red)](https://attack.mitre.org/)
+[![License](https://img.shields.io/badge/License-Private-darkred)](LICENSE)
 [![Sync Status](https://img.shields.io/badge/Sync-Automated-green)](https://github.com/paolokappa/wazuh-siem-rules)
+[![Security](https://img.shields.io/badge/Security-Enterprise-purple)](https://goline.ch)
+
+---
+
+**SENTINEL-X** is a comprehensive enterprise security rules engine built on Wazuh SIEM, featuring 270+ custom detection and response rules optimized for modern threat landscapes. Developed and maintained by GOLINE SA's Security Operations Center.
 
 ## 📋 Table of Contents
 - [Overview](#overview)
@@ -19,15 +27,17 @@
 
 ## 🎯 Overview
 
-This repository contains custom Wazuh SIEM rules and agent configurations for enterprise infrastructure. It provides centralized management, version control, and automated synchronization for all Wazuh security configurations.
+**SENTINEL-X** is GOLINE SA's proprietary security detection framework, engineered to provide enterprise-grade threat detection, incident response, and compliance monitoring. This repository serves as the central nervous system for our security operations, containing battle-tested rules refined through real-world incident response.
 
-### Key Features
-- 🛡️ **Custom Security Rules**: Detection and whitelist rules for various threats and legitimate software
-- 🔄 **Automated Synchronization**: Hourly backup to GitHub
-- 📦 **Complete Configuration Management**: Rules, agent groups, and deployment scripts
-- 🚀 **Easy Deployment**: One-command deployment from Git to production
-- 📊 **Version Control**: Track all changes with Git history
-- 🔐 **Security-First Design**: Separate detection and whitelist rules
+### ⚡ Core Capabilities
+- 🎯 **270+ Custom Rules**: Fine-tuned detection logic for enterprise threats
+- 🤖 **Automated Response**: Active countermeasures against identified threats
+- 🌐 **Threat Intelligence**: Integration with MISP, VirusTotal, and Suricata IDS
+- 🔬 **Advanced Detection**: YARA scanning, DLL hijacking, DNS tunneling
+- 🏢 **Enterprise Ready**: Optimized for Windows AD, Linux servers, and cloud workloads
+- 📊 **MITRE ATT&CK**: Full framework mapping for threat hunting
+- 🚀 **GitOps Workflow**: Infrastructure-as-code security management
+- 🔐 **Zero Trust Architecture**: Granular whitelisting and verification
 
 ## 📁 Repository Structure
 
@@ -451,17 +461,28 @@ ls -la /var/ossec/backup/
 
 ## 📝 License
 
-This repository contains proprietary security configurations for buonvicini.local infrastructure. 
-All rights reserved. Not for public distribution.
+**SENTINEL-X** is proprietary software of GOLINE SA.  
+© 2025 GOLINE SA, Switzerland. All rights reserved.  
+Unauthorized use, reproduction, or distribution is strictly prohibited.
 
 ## 🏆 Acknowledgments
 
-- Wazuh Project for the excellent SIEM platform
-- MITRE ATT&CK for threat framework
-- Security community for threat intelligence
+- **Wazuh Project** - For the powerful open-source SIEM foundation
+- **MITRE Corporation** - For the ATT&CK framework
+- **Suricata Team** - For the exceptional IDS engine
+- **Security Community** - For shared threat intelligence
 
 ---
 
-*Last Updated: August 2025*
-*Version: 1.0.0*
-*Maintained by: SOC Team - GOLINE SA*
+<div align="center">
+
+### 🛡️ SENTINEL-X
+**Enterprise Security Rules Engine**
+
+*Version 2.0 | August 2025*  
+*Engineered by GOLINE SA Security Operations Center*  
+*Stabio, Switzerland* 🇨🇭
+
+[![GOLINE SA](https://img.shields.io/badge/GOLINE-Security-blue?style=for-the-badge)](https://goline.ch)
+
+</div>

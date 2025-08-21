@@ -20,6 +20,7 @@
 - [Usage](#usage)
 - [Rules Documentation](#rules-documentation)
 - [Agent Configurations](#agent-configurations)
+- [Sysmon Integration](#sysmon-integration)
 - [Automation](#automation)
 - [Troubleshooting](#troubleshooting)
 - [Contributing](#contributing)
@@ -56,6 +57,8 @@ wazuh-siem-rules/
 │   │   └── agent.conf               # Windows Servers configuration
 │   └── MacOS/
 │       └── agent.conf               # MacOS agents configuration
+├── sysmon/                          # Sysmon configuration and documentation
+│   └── sysmon_config.xml            # Enterprise Sysmon configuration (424KB, 5773 lines)
 ├── scripts/                         # Management scripts
 │   ├── sync-rules.sh               # Sync from Wazuh to Git
 │   ├── deploy-rules.sh             # Deploy from Git to Wazuh
@@ -298,6 +301,249 @@ ls -la /root/wazuh-rules-repo/.git/FETCH_HEAD
 - **Security Framework**: XProtect, Gatekeeper monitoring
 - **Log Collection**: Unified logs, security logs
 - **Application Monitoring**: App installations and updates
+
+## 🕵️ Sysmon Integration
+
+### Overview
+**Sysmon (System Monitor)** is a Windows system service that logs system activity to the Windows Event Log, providing detailed information about process creations, network connections, and file/registry changes. Our enterprise configuration (`sysmon_config.xml`) is specifically tuned for **Wazuh SIEM integration** and represents **422KB of advanced threat detection rules** across **5,773 lines**.
+
+### Why Sysmon + Wazuh?
+- 🎯 **Enhanced Visibility**: Capture events Windows doesn't log by default
+- 🔍 **Process Genealogy**: Complete parent-child process relationships
+- 🌐 **Network Monitoring**: All network connections with process context
+- 📁 **File Activity**: Comprehensive file system monitoring
+- 🛡️ **Attack Detection**: Advanced techniques like DLL injection, hollowing
+- 📊 **MITRE ATT&CK Mapping**: Direct correlation with attack techniques
+
+### Sysmon Configuration Details
+
+Our `sysmon_config.xml` includes:
+
+#### 📋 Event Types Monitored (17 Categories)
+
+| Event ID | Category | Description | Security Value |
+|----------|----------|-------------|----------------|
+| **1** | Process Creation | Command lines, hashes, parent processes | Malware execution, living-off-the-land |
+| **2** | File Creation Time | File timestamp modifications | Anti-forensics, timestomping (T1070.006) |
+| **3** | Network Connection | Outbound connections with process context | C2 communication, data exfiltration |
+| **4** | Sysmon Service State | Service start/stop events | Service manipulation detection |
+| **5** | Process Termination | Process end with termination codes | Process hiding, defensive evasion |
+| **6** | Driver Load | Kernel driver loading events | Rootkit installation, privilege escalation |
+| **7** | Image/DLL Load | Dynamic library loading | DLL injection (T1055), side-loading (T1574) |
+| **8** | CreateRemoteThread | Remote thread creation | Process injection, code injection |
+| **9** | RawAccessRead | Direct disk/volume access | Volume shadow copy attacks, disk forensics |
+| **10** | ProcessAccess | Process memory access | Credential dumping (T1003), LSASS access |
+| **11** | FileCreate | File creation events | Malware drops, lateral movement artifacts |
+| **12-14** | Registry Events | Registry modifications | Persistence mechanisms, configuration changes |
+| **15** | FileCreateStreamHash | Alternate Data Stream creation | ADS hiding techniques (T1564.004) |
+| **17-18** | Pipe Events | Named pipe creation/connection | Inter-process communication, privilege escalation |
+| **19-21** | WMI Events | WMI activity monitoring | WMI persistence (T1546.003), lateral movement |
+| **22** | DNS Query | DNS resolution requests | DNS tunneling (T1071.004), C2 domains |
+| **23,26** | File Delete | File deletion tracking | Evidence destruction, log clearing |
+
+#### 🎯 Advanced Detection Features
+
+##### Process Monitoring (Event ID 1)
+```xml
+<!-- Example: Detect PowerShell with suspicious parameters -->
+<ProcessCreate onmatch="include">
+  <CommandLine condition="contains all">powershell;-enc;-nop</CommandLine>
+  <CommandLine condition="contains all">powershell;-w hidden;-noni</CommandLine>
+</ProcessCreate>
+```
+
+**Detection Capabilities:**
+- Encoded PowerShell commands (`-EncodedCommand`)
+- Hidden window execution (`-WindowStyle Hidden`)
+- Bypass execution policy (`-ExecutionPolicy Bypass`)
+- Living-off-the-land binaries (LOLBins) usage
+- Suspicious parent-child relationships
+
+##### Network Monitoring (Event ID 3)
+```xml
+<!-- Example: Monitor suspicious network destinations -->
+<NetworkConnect onmatch="include">
+  <DestinationPort condition="is">4444</DestinationPort>
+  <DestinationPort condition="is">5555</DestinationPort>
+  <DestinationHostname condition="end with">.onion</DestinationHostname>
+</NetworkConnect>
+```
+
+**Detection Capabilities:**
+- Command and Control (C2) connections
+- Tor network usage (.onion domains)
+- Uncommon ports for common processes
+- Lateral movement network patterns
+- Data exfiltration to cloud services
+
+##### DLL Injection Detection (Event ID 7)
+```xml
+<!-- Example: Detect unsigned DLLs in critical processes -->
+<ImageLoad onmatch="include">
+  <Image condition="end with">lsass.exe</Image>
+  <Signed condition="is">false</Signed>
+</ImageLoad>
+```
+
+**Detection Capabilities:**
+- Unsigned DLL loading in critical processes
+- DLL side-loading attacks (T1574.002)
+- Process hollowing detection
+- Reflective DLL loading
+- Import address table (IAT) hooking
+
+### Deployment Guide
+
+#### Prerequisites
+- Windows 10/11 or Windows Server 2016+
+- Administrative privileges
+- 100MB free disk space (for Sysmon)
+- Wazuh agent installed and configured
+
+#### Installation Steps
+
+##### 1. Download Sysmon
+```powershell
+# Download Sysmon from Microsoft Sysinternals
+Invoke-WebRequest -Uri "https://download.sysinternals.com/files/Sysmon.zip" -OutFile "C:\temp\Sysmon.zip"
+Expand-Archive -Path "C:\temp\Sysmon.zip" -DestinationPath "C:\Program Files\Sysmon"
+```
+
+##### 2. Deploy Configuration
+```powershell
+# Copy our enterprise configuration
+Copy-Item "sysmon_config.xml" -Destination "C:\Program Files\Sysmon\"
+
+# Install Sysmon with configuration
+cd "C:\Program Files\Sysmon"
+.\sysmon64.exe -accepteula -i sysmon_config.xml
+```
+
+##### 3. Verify Installation
+```powershell
+# Check Sysmon service status
+Get-Service Sysmon64
+
+# Verify event logging
+Get-WinEvent -LogName "Microsoft-Windows-Sysmon/Operational" -MaxEvents 5
+```
+
+##### 4. Configure Wazuh Agent
+Add to `ossec.conf` on Windows agents:
+```xml
+<localfile>
+  <location>Microsoft-Windows-Sysmon/Operational</location>
+  <log_format>eventchannel</log_format>
+</localfile>
+```
+
+#### Group Policy Deployment (Enterprise)
+```powershell
+# Create GPO for Sysmon deployment
+New-GPO -Name "SENTINEL-X Sysmon Deployment" -Comment "Enterprise Sysmon configuration"
+
+# Configure startup script
+Set-GPPrefRegistryValue -Name "SENTINEL-X Sysmon Deployment" -Key "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Run" -ValueName "Sysmon" -Value "C:\Program Files\Sysmon\sysmon64.exe" -Type String
+```
+
+### Performance Optimization
+
+#### Resource Impact
+- **CPU Usage**: 1-3% average on modern systems
+- **Memory Usage**: 10-20MB resident memory
+- **Disk I/O**: 50-200 events/second (varies by activity)
+- **Log Volume**: 10-100MB per day per endpoint
+
+#### Tuning Recommendations
+```xml
+<!-- Reduce noise from common processes -->
+<ProcessCreate onmatch="exclude">
+  <Image condition="end with">chrome.exe</Image>
+  <Image condition="end with">firefox.exe</Image>
+  <ParentImage condition="end with">explorer.exe</ParentImage>
+</ProcessCreate>
+```
+
+#### Log Rotation Configuration
+```xml
+<!-- Configure Windows Event Log limits -->
+<Configuration>
+  <LogSettings>
+    <MaxLogSize>100MB</MaxLogSize>
+    <RetentionDays>30</RetentionDays>
+  </LogSettings>
+</Configuration>
+```
+
+### Integration with Wazuh Rules
+
+Our Sysmon configuration works seamlessly with **220+ custom Wazuh rules** for:
+
+#### Automated Threat Detection
+- **Process Creation Anomalies**: Rules 220040-220044
+- **Network Connection Monitoring**: Rules 110240-110245  
+- **DLL Injection Detection**: Rules 170000-170999
+- **Registry Persistence**: Rules 200000-209999
+
+#### Example Integration
+```xml
+<!-- Wazuh rule detecting Sysmon Event ID 1 with suspicious PowerShell -->
+<rule id="220041" level="15">
+  <if_sid>61603</if_sid>
+  <field name="win.eventdata.commandLine" type="pcre2">(?i)powershell.*-enc.*</field>
+  <description>CRITICAL: Encoded PowerShell command detected via Sysmon</description>
+  <mitre>
+    <id>T1059.001</id>
+    <id>T1027</id>
+  </mitre>
+</rule>
+```
+
+### Maintenance and Updates
+
+#### Regular Tasks
+```powershell
+# Check Sysmon version
+sysmon64.exe -c
+
+# Update configuration (without restart)
+sysmon64.exe -c sysmon_config.xml
+
+# View current configuration
+sysmon64.exe -c | Out-File current_config.xml
+```
+
+#### Configuration Management
+- **Version Control**: All changes tracked in this Git repository
+- **Automated Sync**: Configuration updated every 6 hours from domain controller
+- **Testing**: New rules tested in lab environment first
+- **Rollback**: Previous configurations maintained in Git history
+
+#### Troubleshooting Common Issues
+```powershell
+# Sysmon not logging events
+Get-WinEvent -LogName "Microsoft-Windows-Sysmon/Operational" -MaxEvents 1
+
+# Service not starting
+Get-EventLog -LogName System -Source "Service Control Manager" | Where-Object {$_.Message -like "*Sysmon*"}
+
+# Configuration syntax errors
+sysmon64.exe -c sysmon_config.xml -v
+```
+
+### Security Considerations
+
+#### Configuration Security
+- **Schema Validation**: XML configuration validated against Sysmon schema
+- **Access Control**: Configuration files protected with NTFS permissions
+- **Tamper Detection**: File integrity monitoring on Sysmon configuration
+- **Event Forwarding**: Secure transport to Wazuh Manager via TLS
+
+#### Evasion Resistance
+- **Multiple Detection Layers**: Process, network, and file system monitoring
+- **Behavioral Analysis**: Pattern detection across multiple event types
+- **Anti-Tampering**: Sysmon self-protection mechanisms
+- **Log Integrity**: Windows Event Log security and audit trails
 
 ## 🤖 Automation
 

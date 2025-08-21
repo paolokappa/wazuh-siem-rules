@@ -15,13 +15,13 @@
     Version: 2.0
     Last Updated: August 2025
     
-    Domain: Enterprise Infrastructure
-    SOC Platform: GOLINE Security Operations Center
+    Domain: buonvicini.local
+    SOC Platform: soc.goline.ch
     GitHub: https://github.com/paolokappa/wazuh-siem-rules
     
     Description:
     This configuration contains custom detection and whitelist rules optimized
-    for enterprise infrastructure. Rules are mapped to MITRE ATT&CK
+    for the buonvicini.local infrastructure. Rules are mapped to MITRE ATT&CK
     framework and tuned for enterprise security monitoring.
     
     Rule ID Ranges:
@@ -2059,7 +2059,7 @@
   <!-- Whitelist ADAudit Plus from all domain controllers at base PowerShell level -->
   <rule id="220037" level="0">
     <if_sid>91802</if_sid>
-    <field name="win.system.computer" type="pcre2">(?i)(DC\d+|[A-Z]+\d+)\.[\w-]+\.local</field>
+    <field name="win.system.computer" type="pcre2">(?i)(DC\d+|BUSE\d+)\.buonvicini\.local</field>
     <field name="win.eventdata.scriptBlockText" type="pcre2">(?i)Invoke-Command.*Search-AdminAuditLog.*ResultSize\s+250000</field>
     <description>ADAudit Plus legitimate audit log collection via Invoke-Command from domain controller - Whitelisted</description>
     <options>no_full_log</options>
@@ -2068,7 +2068,7 @@
   <!-- Whitelist ADAudit Plus from all domain controllers BEFORE detection rules -->
   <rule id="220039" level="0">
     <if_sid>91822</if_sid>
-    <field name="win.system.computer" type="pcre2">(?i)(DC\d+|[A-Z]+\d+)\.[\w-]+\.local</field>
+    <field name="win.system.computer" type="pcre2">(?i)(DC\d+|BUSE\d+)\.buonvicini\.local</field>
     <field name="win.eventdata.scriptBlockText" type="pcre2">(?i)Search-AdminAuditLog.*ResultSize\s+250000</field>
     <description>ADAudit Plus legitimate audit log collection from domain controller - Whitelisted</description>
     <options>no_full_log</options>
@@ -2104,7 +2104,7 @@
   <rule id="220038" level="0">
     <if_sid>91802</if_sid>
     <field name="win.eventdata.scriptBlockText" type="pcre2">(?i)Import-PSSession.*Search-AdminAuditLog</field>
-    <field name="win.system.computer" type="pcre2">(?i)(DC\d+|[A-Z]+\d+)\.[\w-]+\.local</field>
+    <field name="win.system.computer" type="pcre2">(?i)(DC\d+|BUSE\d+)\.buonvicini\.local</field>
     <description>Legitimate Exchange Import-PSSession with Search-AdminAuditLog from domain controllers - whitelisted</description>
     <group>whitelist,exchange,</group>
   </rule>
@@ -2328,7 +2328,7 @@
   <!-- Rule 220080: Whitelist ADAudit Plus legitimate audit log collection from all domain controllers -->
   <rule id="220080" level="0">
     <if_sid>220041</if_sid>
-    <field name="win.system.computer" type="pcre2">(?i)(DC\d+|[A-Z]+\d+)\.[\w-]+\.local</field>
+    <field name="win.system.computer" type="pcre2">(?i)(DC\d+|BUSE\d+)\.buonvicini\.local</field>
     <field name="win.eventdata.scriptBlockText">Search-AdminAuditLog.*ResultSize 250000</field>
     <description>ADAudit Plus legitimate audit log collection from domain controller - Whitelisted</description>
     <options>no_full_log</options>
@@ -2794,8 +2794,8 @@
     <if_sid>92650</if_sid>
     <field name="win.eventdata.serviceName">PsShutdown</field>
     <field name="win.eventdata.imagePath" type="pcre2">(?i)%SystemRoot%\\\\PSSDNSVC\.EXE</field>
-    <field name="win.system.computer" type="pcre2">\.[\w-]+\.local$</field>
-    <description>Whitelist: PsShutdown service on domain computers</description>
+    <field name="win.system.computer" type="pcre2">\.buonvicini\.local$</field>
+    <description>Whitelist: PsShutdown service on buonvicini.local domain computers</description>
     <group>psshutdown,whitelist,domain_shutdown</group>
   </rule>
 

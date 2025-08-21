@@ -1,7 +1,45 @@
 
+<!-- 
+================================================================================
+    WAZUH SIEM CUSTOM SECURITY RULES
+    GOLINE SA - Enterprise Security Configuration
+    
+    Organization: GOLINE SA
+    Address: Via Croce Campagna 2
+             6855 Stabio - Switzerland
+    Phone: +41 91 2607650
+    Website: https://goline.ch
+    
+    Author: Paolo Caparrelli - Security Specialist
+    Email: kappa@goline.ch
+    Version: 2.0
+    Last Updated: August 2025
+    
+    Domain: buonvicini.local
+    SOC Platform: soc.goline.ch
+    GitHub: https://github.com/paolokappa/wazuh-siem-rules
+    
+    Description:
+    This configuration contains custom detection and whitelist rules optimized
+    for the buonvicini.local infrastructure. Rules are mapped to MITRE ATT&CK
+    framework and tuned for enterprise security monitoring.
+    
+    Rule ID Ranges:
+    - 100200-100250: Initial Access & Execution
+    - 110001-110999: System Monitoring & Threats
+    - 220000-220099: General Security Rules
+    - 220100-220199: Application Whitelist Rules
+    - 220200-220299: System & Utility Whitelist Rules
+    
+    Copyright (C) 2025, GOLINE SA. All rights reserved.
+    Licensed for use only within GOLINE SA and authorized partners.
+================================================================================
+-->
+
 <!-- Local rules -->
 <!-- Optimized for Wazuh 4.12.0 with MITRE ATT&CK Framework -->
-<!-- Copyright (C) 2015, Wazuh Inc. -->
+<!-- Copyright (C) 2015, Wazuh Inc. - Original Framework -->
+<!-- Copyright (C) 2025, GOLINE SA - Custom Rules -->
 
 <!-- ======================================== -->
 <!--     MITRE ATT&CK OPTIMIZED RULES         -->
@@ -2328,7 +2366,12 @@
 </group>
 <!-- End ADAudit Plus Whitelist Rules -->
 
-<!-- PrintNightmare/Print Spooler Vulnerability Detection Rules -->
+<!-- 
+================================================================================
+    PRINTNIGHTMARE/PRINT SPOOLER VULNERABILITY DETECTION
+    GOLINE SA - Critical Vulnerability Monitoring
+================================================================================
+-->
 <group name="printnightmare,syscheck,windows">
   
   <!-- Rule 220100: Suspicious DLL in print spooler directory (sx_p2d_client32.dll) -->
@@ -2369,7 +2412,12 @@
 </group>
 <!-- End PrintNightmare Detection Rules -->
 
-<!-- VS Code Server Whitelist Rules -->
+<!-- 
+================================================================================
+    VS CODE SERVER WHITELIST RULES
+    GOLINE SA - Development Tools Security
+================================================================================
+-->
 <group name="syscheck,vscode_whitelist">
 
   <!-- Rule 220110: Whitelist VS Code Server files in .vscode-server directory -->
@@ -2798,5 +2846,29 @@
 
 </group>
 <!-- End NinjaOne RMM Software Deployment Whitelist Rules -->
+
+<!-- 
+================================================================================
+    END OF CONFIGURATION
+    GOLINE SA - Enterprise Security Rules
+    
+    This configuration is maintained by:
+    Paolo Caparrelli - Security Specialist
+    GOLINE SA, Stabio, Switzerland
+    
+    For support contact:
+    Email: kappa@goline.ch
+    Phone: +41 91 2607650
+    
+    GitHub Repository: https://github.com/paolokappa/wazuh-siem-rules
+    Auto-sync enabled: Every hour at minute 0
+    
+    Version: 2.0
+    Last Modified: August 2025
+    Total Custom Rules: 100+ detection and whitelist rules
+    
+    Copyright (C) 2025, GOLINE SA. All rights reserved.
+================================================================================
+-->
 
 <!-- End of local_rules.xml -->
